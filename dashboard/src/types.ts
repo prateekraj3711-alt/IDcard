@@ -66,10 +66,94 @@ export interface Student {
 }
 
 export interface IdCardJob {
-  job_id: string;
+  id: string;
+  school_id: string;
+  template_id: string;
+  output_format: 'pdf' | 'png' | 'zip';
+  layout: 'single' | 'a4-sheet';
   status: 'queued' | 'running' | 'done' | 'failed';
-  download_url?: string;
-  expires_at?: string;
+  total: number;
+  processed: number;
+  output_key: string | null;
+  download_url?: string | null;
+  error?: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export type TemplateModule = 'student' | 'employee';
+
+export interface Template {
+  id: string;
+  school_id: string | null;
+  module: TemplateModule;
+  name: string;
+  version: number;
+  layout_json: TemplateLayout | null;
+  html: string | null;
+  css: string;
+  paper_size: string;
+  card_width_mm: number;
+  card_height_mm: number;
+  is_active: boolean;
+  created_at: string;
+}
+
+export interface TemplateLayout {
+  width: number;
+  height: number;
+  background: string;
+  elements: TemplateElement[];
+}
+
+export type ElementKind = 'text' | 'image' | 'qr' | 'barcode';
+
+export interface TemplateElement {
+  id: string;
+  kind: ElementKind;
+  binding?: string;         // e.g. "student.name" | "photo" | "qr"
+  label?: string;           // static label rendered in the editor palette
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  fontSize?: number;
+  fontFamily?: string;
+  fill?: string;
+  align?: 'left' | 'center' | 'right';
+  text?: string;            // static text (for header, "STUDENT ID CARD", etc.)
+  src?: string;             // static image data-uri / URL
+  rotation?: number;
+}
+
+export interface FieldCatalogEntry {
+  field: string;
+  label: string;
+  kind: ElementKind;
+}
+
+export interface BulkImportRow {
+  id: string;
+  row_index: number;
+  raw: Record<string, unknown>;
+  mapped: Record<string, unknown> | null;
+  status: 'pending' | 'valid' | 'invalid' | 'imported' | 'failed';
+  errors: Array<{ field?: string; code?: string; message?: string }> | null;
+  photo_storage_key: string | null;
+}
+
+export interface BulkImportPreview {
+  import_id: string;
+  columns_detected: string[];
+  suggested_mapping: Record<string, string>;
+  total_rows: number;
+  sample: BulkImportRow[];
+}
+
+export interface BulkImportCommitResult {
+  imported: number;
+  failed: number;
+  photos_matched: number;
 }
 
 export interface LoginResponse {

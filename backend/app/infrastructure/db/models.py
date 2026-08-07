@@ -56,6 +56,34 @@ class SyncStatus(str, enum.Enum):
     failed = "failed"
 
 
+class BulkImportStatus(str, enum.Enum):
+    uploaded = "uploaded"
+    validated = "validated"
+    importing = "importing"
+    completed = "completed"
+    failed = "failed"
+
+
+class BulkImportRowStatus(str, enum.Enum):
+    pending = "pending"
+    valid = "valid"
+    invalid = "invalid"
+    imported = "imported"
+    failed = "failed"
+
+
+class IdCardJobStatus(str, enum.Enum):
+    queued = "queued"
+    running = "running"
+    done = "done"
+    failed = "failed"
+
+
+class TemplateModule(str, enum.Enum):
+    student = "student"
+    employee = "employee"
+
+
 class School(Base, UUIDPK, Timestamped, SoftDelete):
     __tablename__ = "schools"
 
@@ -239,13 +267,27 @@ class IdCardTemplate(Base, UUIDPK, Timestamped):
     __tablename__ = "id_card_templates"
 
     school_id: Mapped[UUID | None] = mapped_column(PG_UUID(as_uuid=True), ForeignKey("schools.id"))
+    module: Mapped[TemplateModule] = mapped_column(
+        Enum(TemplateModule, name="template_module"),
+        server_default=TemplateModule.student.value,
+        nullable=False,
+    )
     name: Mapped[str] = mapped_column(String(100), nullable=False)
     version: Mapped[int] = mapped_column(Integer, server_default="1", nullable=False)
-    html: Mapped[str] = mapped_column(Text, nullable=False)
+    # Canvas layout produced by the Konva editor. Rendered → HTML/CSS at generation time.
+    # Each element carries a `binding` (e.g. "student.name", "employee.designation",
+    # "qr", "barcode", "photo", "school.logo", "user.signature") plus visual props.
+    layout_json: Mapped[dict | None] = mapped_column(JSONB)
+    # Fallback: hand-written HTML/CSS templates for advanced users.
+    html: Mapped[str | None] = mapped_column(Text)
     css: Mapped[str] = mapped_column(Text, server_default="", nullable=False)
     paper_size: Mapped[str] = mapped_column(String(10), server_default="A4", nullable=False)
+    card_width_mm: Mapped[int] = mapped_column(Integer, server_default="86", nullable=False)   # CR80 default
+    card_height_mm: Mapped[int] = mapped_column(Integer, server_default="54", nullable=False)
     is_active: Mapped[bool] = mapped_column(Boolean, server_default="true", nullable=False)
     created_by: Mapped[UUID | None] = mapped_column(PG_UUID(as_uuid=True), ForeignKey("users.id"))
+
+    __table_args__ = (Index("ix_templates_module_school", "module", "school_id"),)
 
 
 class IdCard(Base, UUIDPK, Timestamped):
@@ -261,3 +303,81 @@ class IdCard(Base, UUIDPK, Timestamped):
     png_key: Mapped[str | None] = mapped_column(Text)
     qr_payload: Mapped[dict | None] = mapped_column(JSONB)
     generated_by: Mapped[UUID | None] = mapped_column(PG_UUID(as_uuid=True), ForeignKey("users.id"))
+
+
+class BulkImport(Base, UUIDPK, Timestamped):
+    __tablename__ = "bulk_imports"
+
+    school_id: Mapped[UUID] = mapped_column(
+        PG_UUID(as_uuid=True), ForeignKey("schools.id"), nullable=False
+    )
+    uploader_id: Mapped[UUID] = mapped_column(
+        PG_UUID(as_uuid=True), ForeignKey("users.id"), nullable=False
+    )
+    source_type: Mapped[str] = mapped_column(String(10), nullable=False)   # "xlsx" | "csv"
+    original_filename: Mapped[str] = mapped_column(String(255), nullable=False)
+    spreadsheet_key: Mapped[str | None] = mapped_column(Text)
+    photos_prefix: Mapped[str | None] = mapped_column(Text)  # S3 prefix for extracted photos
+    column_mapping: Mapped[dict | None] = mapped_column(JSONB)
+    status: Mapped[BulkImportStatus] = mapped_column(
+        Enum(BulkImportStatus, name="bulk_import_status"),
+        server_default=BulkImportStatus.uploaded.value,
+        nullable=False,
+    )
+    stats: Mapped[dict | None] = mapped_column(JSONB)   # {total, valid, invalid, imported, photos_matched}
+    error: Mapped[str | None] = mapped_column(Text)
+
+    rows: Mapped[list["BulkImportRow"]] = relationship(back_populates="bulk_import", cascade="all, delete-orphan")
+
+
+class BulkImportRow(Base, UUIDPK, Timestamped):
+    __tablename__ = "bulk_import_rows"
+
+    bulk_import_id: Mapped[UUID] = mapped_column(
+        PG_UUID(as_uuid=True), ForeignKey("bulk_imports.id", ondelete="CASCADE"), nullable=False
+    )
+    row_index: Mapped[int] = mapped_column(Integer, nullable=False)
+    raw: Mapped[dict] = mapped_column(JSONB, nullable=False)     # original cells by header
+    mapped: Mapped[dict | None] = mapped_column(JSONB)           # normalized to student fields
+    status: Mapped[BulkImportRowStatus] = mapped_column(
+        Enum(BulkImportRowStatus, name="bulk_import_row_status"),
+        server_default=BulkImportRowStatus.pending.value,
+        nullable=False,
+    )
+    errors: Mapped[list | None] = mapped_column(JSONB)
+    photo_storage_key: Mapped[str | None] = mapped_column(Text)
+    student_id: Mapped[UUID | None] = mapped_column(
+        PG_UUID(as_uuid=True), ForeignKey("students.id")
+    )
+
+    bulk_import: Mapped[BulkImport] = relationship(back_populates="rows")
+
+    __table_args__ = (Index("ix_bulk_import_rows_import", "bulk_import_id"),)
+
+
+class IdCardJob(Base, UUIDPK, Timestamped):
+    __tablename__ = "id_card_jobs"
+
+    school_id: Mapped[UUID] = mapped_column(
+        PG_UUID(as_uuid=True), ForeignKey("schools.id"), nullable=False
+    )
+    requested_by: Mapped[UUID] = mapped_column(
+        PG_UUID(as_uuid=True), ForeignKey("users.id"), nullable=False
+    )
+    template_id: Mapped[UUID] = mapped_column(
+        PG_UUID(as_uuid=True), ForeignKey("id_card_templates.id"), nullable=False
+    )
+    student_ids: Mapped[list | None] = mapped_column(JSONB)      # explicit set (nullable)
+    class_id: Mapped[UUID | None] = mapped_column(PG_UUID(as_uuid=True), ForeignKey("classes.id"))
+    section_id: Mapped[UUID | None] = mapped_column(PG_UUID(as_uuid=True), ForeignKey("sections.id"))
+    output_format: Mapped[str] = mapped_column(String(10), nullable=False)     # "pdf" | "png" | "zip"
+    layout: Mapped[str] = mapped_column(String(20), nullable=False)            # "single" | "a4-sheet"
+    total: Mapped[int] = mapped_column(Integer, server_default="0", nullable=False)
+    processed: Mapped[int] = mapped_column(Integer, server_default="0", nullable=False)
+    status: Mapped[IdCardJobStatus] = mapped_column(
+        Enum(IdCardJobStatus, name="id_card_job_status"),
+        server_default=IdCardJobStatus.queued.value,
+        nullable=False,
+    )
+    output_key: Mapped[str | None] = mapped_column(Text)  # S3 key of PDF/ZIP
+    error: Mapped[str | None] = mapped_column(Text)

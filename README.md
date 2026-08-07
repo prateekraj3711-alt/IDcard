@@ -18,6 +18,8 @@ A production-grade platform for capturing student information from schools and g
 - [Authentication Flow](docs/AUTH_FLOW.md)
 - [Offline Sync Strategy](docs/OFFLINE_SYNC.md)
 - [Image Upload Strategy](docs/IMAGE_UPLOAD.md)
+- [Bulk Import Pipeline](docs/BULK_IMPORT.md)
+- [ID Card Template Editor](docs/TEMPLATE_EDITOR.md)
 - [Security](docs/SECURITY.md)
 - [Deployment](docs/DEPLOYMENT.md)
 - [Future Enhancements](docs/FUTURE_ENHANCEMENTS.md)

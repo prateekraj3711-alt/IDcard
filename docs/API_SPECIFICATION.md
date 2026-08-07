@@ -265,32 +265,77 @@ Response 200:
 
 The server records each result in `sync_logs`.
 
-## ID Cards
+## Templates
 
-### POST `/id-cards/generate`
-Enqueues a render job.
+Templates are versioned per-module (`student` or `employee`) card designs. Field labels are configurable via `layout_json`; each element carries a `binding` from the canonical catalog.
+
+### GET `/templates?module=student&school_id={uuid}`
+### POST `/templates`
 ```json
 {
-  "student_ids": ["7d8…", "…"],   // OR class_id / school_id / section_id
+  "school_id": "…",
+  "module": "student",
+  "name": "DPS Delhi — Front",
+  "layout_json": { "width": 340, "height": 214, "background": "#fff", "elements": [ … ] },
+  "paper_size": "A4", "card_width_mm": 86, "card_height_mm": 54
+}
+```
+### PATCH `/templates/{id}`  (bumps `version`)
+### GET `/templates/fields/catalog?module=student|employee`
+Returns the binding vocabulary the editor should render in its palette.
+
+## ID Card Jobs (bulk generation)
+
+### POST `/id-card-jobs`
+```json
+{
   "template_id": "…",
-  "format": "pdf",                 // "pdf" | "png"
-  "layout": "single" | "a4-sheet"
+  "school_id": "…",
+  "student_ids": ["…"],       // OR provide class_id / section_id
+  "output_format": "pdf",     // "pdf" | "png" | "zip"
+  "layout": "a4-sheet"        // "single" | "a4-sheet"
 }
 ```
 Response 202:
 ```json
-{ "job_id": "job_01H…", "status": "queued" }
+{ "id": "…", "status": "queued", "total": 1000, "processed": 0, ... }
 ```
 
-### GET `/id-cards/jobs/{job_id}`
+### GET `/id-card-jobs/{id}`
 ```json
-{ "job_id": "…", "status": "done", "download_url": "https://…/idcards/job_01H….pdf", "expires_at": "…" }
+{
+  "id": "…",
+  "status": "done",
+  "total": 1000, "processed": 1000,
+  "output_format": "pdf",
+  "download_url": "https://cdn.example.com/idcards/…",
+  "output_key": "jobs/…/bundle.pdf"
+}
 ```
 
-### GET `/id-cards/{student_id}/preview`
-Returns rendered PNG bytes (streamed) — useful for the dashboard preview panel.
+### GET `/id-cards/{student_id}/preview?template_id={uuid}`
+Returns a rendered PNG (streamed) for the dashboard preview panel.
 
-### GET `/templates` / POST `/templates` / PUT `/templates/{id}`
+## Bulk Imports
+
+### POST `/bulk-imports` (multipart)
+Form fields: `school_id`, `file` (.xlsx or .csv).  Response: `BulkImportPreview` (10 sample rows, suggested mapping).
+
+### POST `/bulk-imports/{id}/photos` (multipart)
+Field: `file` (ZIP). Server matches by filename stem against enrollment_no.
+
+### POST `/bulk-imports/{id}/commit`
+```json
+{
+  "column_mapping": { "Student Name": "name", "Enr No.": "enrollment_no", ... },
+  "default_class_id": "…",
+  "default_section_id": "…"
+}
+```
+Response: `{ "imported": N, "failed": F, "photos_matched": M }`.
+
+### GET `/bulk-imports/{id}/rows?status_filter=invalid`
+Row-level results for QA.
 
 ## Exports
 

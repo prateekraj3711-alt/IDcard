@@ -1,6 +1,8 @@
 import { api } from './client';
 import type {
-  LoginResponse, Page, Student, School, Teacher, TeacherCreated, PasswordResetResult, IdCardJob,
+  LoginResponse, Page, Student, School, Teacher, TeacherCreated, PasswordResetResult,
+  IdCardJob, Template, TemplateModule, FieldCatalogEntry,
+  BulkImportPreview, BulkImportCommitResult, BulkImportRow,
 } from '@/types';
 
 export const AuthApi = {
@@ -39,11 +41,52 @@ export const StudentsApi = {
 };
 
 export const IdCardsApi = {
-  generate: (body: {
-    student_ids?: string[]; class_id?: string; school_id?: string;
-    template_id: string; format?: 'pdf' | 'png'; layout?: 'single' | 'a4-sheet';
-  }) => api.post<IdCardJob>('/id-cards/generate', body).then((r) => r.data),
   preview: (studentId: string, templateId: string) =>
     api.get(`/id-cards/${studentId}/preview`, { params: { template_id: templateId }, responseType: 'blob' })
       .then((r) => URL.createObjectURL(r.data)),
+};
+
+export const TemplatesApi = {
+  list: (params: { module?: TemplateModule; school_id?: string }) =>
+    api.get<Template[]>('/templates', { params }).then((r) => r.data),
+  get: (id: string) => api.get<Template>(`/templates/${id}`).then((r) => r.data),
+  create: (body: Partial<Template>) => api.post<Template>('/templates', body).then((r) => r.data),
+  update: (id: string, body: Partial<Template>) => api.patch<Template>(`/templates/${id}`, body).then((r) => r.data),
+  fieldCatalog: (module: TemplateModule) =>
+    api.get<{ module: TemplateModule; fields: FieldCatalogEntry[] }>('/templates/fields/catalog', { params: { module } }).then((r) => r.data),
+};
+
+export const IdCardJobsApi = {
+  create: (body: {
+    template_id: string; school_id: string;
+    student_ids?: string[]; class_id?: string; section_id?: string;
+    output_format?: 'pdf' | 'png' | 'zip';
+    layout?: 'single' | 'a4-sheet';
+  }) => api.post<IdCardJob>('/id-card-jobs', body).then((r) => r.data),
+  get: (id: string) => api.get<IdCardJob>(`/id-card-jobs/${id}`).then((r) => r.data),
+};
+
+export const BulkImportsApi = {
+  uploadSpreadsheet: (schoolId: string, file: File) => {
+    const fd = new FormData();
+    fd.append('school_id', schoolId);
+    fd.append('file', file);
+    return api.post<BulkImportPreview>('/bulk-imports', fd, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    }).then((r) => r.data);
+  },
+  attachPhotos: (importId: string, zipFile: File) => {
+    const fd = new FormData();
+    fd.append('file', zipFile);
+    return api.post<{ photos_uploaded: number; photos_matched: number }>(`/bulk-imports/${importId}/photos`, fd, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    }).then((r) => r.data);
+  },
+  commit: (importId: string, body: {
+    column_mapping?: Record<string, string>;
+    default_class_id?: string;
+    default_section_id?: string;
+  }) => api.post<BulkImportCommitResult>(`/bulk-imports/${importId}/commit`, body).then((r) => r.data),
+  rows: (importId: string, params: { status_filter?: string; limit?: number; offset?: number }) =>
+    api.get<BulkImportRow[]>(`/bulk-imports/${importId}/rows`, { params }).then((r) => r.data),
 };

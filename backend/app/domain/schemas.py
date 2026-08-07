@@ -5,7 +5,17 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator
 
-from app.infrastructure.db.models import Gender, StudentStatus, SyncOp, SyncStatus, UserRole
+from app.infrastructure.db.models import (
+    BulkImportRowStatus,
+    BulkImportStatus,
+    Gender,
+    IdCardJobStatus,
+    StudentStatus,
+    SyncOp,
+    SyncStatus,
+    TemplateModule,
+    UserRole,
+)
 
 
 class ORMModel(BaseModel):
@@ -290,23 +300,6 @@ class SyncBatchOut(BaseModel):
     results: list[SyncOperationResult]
 
 
-class IdCardGenerateRequest(BaseModel):
-    student_ids: list[UUID] | None = None
-    class_id: UUID | None = None
-    school_id: UUID | None = None
-    section_id: UUID | None = None
-    template_id: UUID
-    format: str = Field(default="pdf", pattern=r"^(pdf|png)$")
-    layout: str = Field(default="single", pattern=r"^(single|a4-sheet)$")
-
-
-class IdCardJob(BaseModel):
-    job_id: str
-    status: str
-    download_url: str | None = None
-    expires_at: datetime | None = None
-
-
 class ProblemDetails(BaseModel):
     type: str = "about:blank"
     title: str
@@ -314,3 +307,177 @@ class ProblemDetails(BaseModel):
     detail: str | None = None
     instance: str | None = None
     errors: list[dict] = []
+
+
+# --- Templates -------------------------------------------------------------
+
+class TemplateCreate(BaseModel):
+    school_id: UUID | None = None
+    module: TemplateModule = TemplateModule.student
+    name: str
+    layout_json: dict | None = None
+    html: str | None = None
+    css: str = ""
+    paper_size: str = "A4"
+    card_width_mm: int = 86
+    card_height_mm: int = 54
+
+
+class TemplateUpdate(BaseModel):
+    name: str | None = None
+    module: TemplateModule | None = None
+    layout_json: dict | None = None
+    html: str | None = None
+    css: str | None = None
+    paper_size: str | None = None
+    card_width_mm: int | None = None
+    card_height_mm: int | None = None
+    is_active: bool | None = None
+
+
+class TemplateOut(ORMModel):
+    id: UUID
+    school_id: UUID | None
+    module: TemplateModule
+    name: str
+    version: int
+    layout_json: dict | None
+    html: str | None
+    css: str
+    paper_size: str
+    card_width_mm: int
+    card_height_mm: int
+    is_active: bool
+    created_at: datetime
+
+
+# Canonical binding vocabulary the Konva editor and renderer both know about.
+# Each `field` is what an element's `binding` value references.
+TEMPLATE_FIELD_CATALOG: dict[str, list[dict[str, str]]] = {
+    "student": [
+        {"field": "student.name",            "label": "Name",           "kind": "text"},
+        {"field": "student.enrollment_no",   "label": "Enrollment ID",  "kind": "text"},
+        {"field": "student.class_section",   "label": "Class & Section","kind": "text"},
+        {"field": "student.roll_no",         "label": "Roll No",        "kind": "text"},
+        {"field": "student.dob",             "label": "DOB",            "kind": "text"},
+        {"field": "student.blood_group",     "label": "Blood Group",    "kind": "text"},
+        {"field": "student.father_name",     "label": "Father's Name",  "kind": "text"},
+        {"field": "student.mother_name",     "label": "Mother's Name",  "kind": "text"},
+        {"field": "student.address",         "label": "Address",        "kind": "text"},
+        {"field": "student.mobile",          "label": "Mobile",         "kind": "text"},
+        {"field": "photo",                   "label": "Photo",          "kind": "image"},
+        {"field": "qr",                      "label": "QR Code",        "kind": "qr"},
+        {"field": "barcode",                 "label": "Barcode",        "kind": "barcode"},
+        {"field": "school.logo",             "label": "School Logo",    "kind": "image"},
+        {"field": "school.name",             "label": "School Name",    "kind": "text"},
+        {"field": "principal.signature",     "label": "Signature",      "kind": "image"},
+    ],
+    "employee": [
+        {"field": "employee.name",           "label": "Name",           "kind": "text"},
+        {"field": "employee.employee_id",    "label": "Employee ID",    "kind": "text"},
+        {"field": "employee.designation",    "label": "Designation",    "kind": "text"},
+        {"field": "employee.department",     "label": "Department",     "kind": "text"},
+        {"field": "employee.doj",            "label": "Date of Joining","kind": "text"},
+        {"field": "employee.blood_group",    "label": "Blood Group",    "kind": "text"},
+        {"field": "employee.address",        "label": "Address",        "kind": "text"},
+        {"field": "employee.mobile",         "label": "Mobile",         "kind": "text"},
+        {"field": "photo",                   "label": "Photo",          "kind": "image"},
+        {"field": "qr",                      "label": "QR Code",        "kind": "qr"},
+        {"field": "barcode",                 "label": "Barcode",        "kind": "barcode"},
+        {"field": "org.logo",                "label": "Org Logo",       "kind": "image"},
+        {"field": "org.name",                "label": "Org Name",       "kind": "text"},
+        {"field": "authority.signature",     "label": "Authorised Signatory", "kind": "image"},
+    ],
+}
+
+
+class TemplateFieldCatalog(BaseModel):
+    module: TemplateModule
+    fields: list[dict[str, str]]
+
+
+# --- Bulk import -----------------------------------------------------------
+
+# Sensible defaults matching the sample sheet in the spec image.
+DEFAULT_COLUMN_MAPPING: dict[str, str] = {
+    "Ph No.": "photo_hint",         # a local path or filename hint — used to match photo folder entries
+    "Student Name": "name",
+    "Enr No.": "enrollment_no",
+    "Enr": "enrolled_year",
+    "DOB": "dob",
+    "Father's Name": "father_name",
+    "Mother's Name": "mother_name",
+    "Address": "address",
+    "Mobile": "mobile",
+}
+
+
+class BulkImportOut(ORMModel):
+    id: UUID
+    school_id: UUID
+    source_type: str
+    original_filename: str
+    column_mapping: dict | None
+    status: BulkImportStatus
+    stats: dict | None
+    error: str | None
+    created_at: datetime
+    updated_at: datetime
+
+
+class BulkImportRowOut(ORMModel):
+    id: UUID
+    row_index: int
+    raw: dict
+    mapped: dict | None
+    status: BulkImportRowStatus
+    errors: list | None
+    photo_storage_key: str | None
+
+
+class BulkImportPreview(BaseModel):
+    import_id: UUID
+    columns_detected: list[str]
+    suggested_mapping: dict[str, str]
+    total_rows: int
+    sample: list[BulkImportRowOut]
+
+
+class BulkImportCommitRequest(BaseModel):
+    column_mapping: dict[str, str] | None = None   # overrides on commit
+    default_class_id: UUID | None = None
+    default_section_id: UUID | None = None
+
+
+class BulkImportCommitResult(BaseModel):
+    imported: int
+    failed: int
+    photos_matched: int
+
+
+# --- ID Card generation jobs -----------------------------------------------
+
+class IdCardJobCreate(BaseModel):
+    template_id: UUID
+    school_id: UUID
+    student_ids: list[UUID] | None = None
+    class_id: UUID | None = None
+    section_id: UUID | None = None
+    output_format: str = Field(default="pdf", pattern=r"^(pdf|png|zip)$")
+    layout: str = Field(default="single", pattern=r"^(single|a4-sheet)$")
+
+
+class IdCardJobOut(ORMModel):
+    id: UUID
+    school_id: UUID
+    template_id: UUID
+    output_format: str
+    layout: str
+    status: IdCardJobStatus
+    total: int
+    processed: int
+    output_key: str | None
+    download_url: str | None = None
+    error: str | None
+    created_at: datetime
+    updated_at: datetime

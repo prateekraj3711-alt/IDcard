@@ -5,7 +5,19 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from app.api.middleware import RequestIdMiddleware, SecurityHeadersMiddleware
 from app.api.rate_limit import RateLimiter
-from app.api.routers import auth, health, id_cards, photos, schools, students, sync, teachers
+from app.api.routers import (
+    auth,
+    bulk_imports,
+    health,
+    id_card_jobs,
+    id_cards,
+    photos,
+    schools,
+    students,
+    sync,
+    teachers,
+    templates,
+)
 from app.core.config import settings
 from app.core.logging import configure_logging
 
@@ -56,8 +68,18 @@ async def unhandled_handler(request: Request, exc: Exception):
 
 
 API_V1 = "/api/v1"
-for r in (auth.router, schools.router, teachers.router, students.router,
-          photos.router, sync.router, id_cards.router):
+for r in (
+    auth.router,
+    schools.router,
+    teachers.router,
+    students.router,
+    photos.router,
+    sync.router,
+    id_cards.router,
+    bulk_imports.router,
+    templates.router,
+    id_card_jobs.router,
+):
     app.include_router(r, prefix=API_V1)
 
 app.include_router(health.router)

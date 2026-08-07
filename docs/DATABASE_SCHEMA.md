@@ -193,13 +193,66 @@ Partition by month for retention.
 |---|---|---|
 | id | uuid PK | |
 | school_id | uuid FK NULL | null = system template |
+| module | template_module ENUM | `student` \| `employee` — determines the binding catalog |
 | name | varchar(100) | |
-| version | int | |
-| html | text | Jinja2 template |
+| version | int | bumps on every PATCH |
+| layout_json | jsonb | Konva canvas layout (elements with binding, x/y/w/h, font, kind) |
+| html | text NULL | optional hand-authored HTML (advanced users) |
 | css | text | |
 | paper_size | varchar(10) | e.g. `A4`, `A6` |
+| card_width_mm | int | CR80 default 86 |
+| card_height_mm | int | CR80 default 54 |
 | is_active | boolean | |
 | created_by | uuid FK | |
+
+Index: `(module, school_id)`.
+
+### `bulk_imports`
+| column | type | notes |
+|---|---|---|
+| id | uuid PK | |
+| school_id | uuid FK NOT NULL | |
+| uploader_id | uuid FK users.id | |
+| source_type | varchar(10) | `xlsx` \| `csv` |
+| original_filename | varchar(255) | |
+| spreadsheet_key | text | S3 key of the uploaded sheet |
+| photos_prefix | text | S3 prefix where photos were extracted |
+| column_mapping | jsonb | `{ "Student Name": "name", ... }` |
+| status | bulk_import_status ENUM | `uploaded`, `validated`, `importing`, `completed`, `failed` |
+| stats | jsonb | `{ total, valid, invalid, imported, photos_matched }` |
+| error | text | |
+
+### `bulk_import_rows`
+| column | type | notes |
+|---|---|---|
+| id | uuid PK | |
+| bulk_import_id | uuid FK ON DELETE CASCADE | |
+| row_index | int | 1-based |
+| raw | jsonb | cells by header |
+| mapped | jsonb | normalized to student fields |
+| status | bulk_import_row_status ENUM | `pending`, `valid`, `invalid`, `imported`, `failed` |
+| errors | jsonb | list of `{ field, code, message }` |
+| photo_storage_key | text | matched photo (if any) |
+| student_id | uuid FK NULL | filled after successful commit |
+
+Index: `(bulk_import_id)`.
+
+### `id_card_jobs`
+| column | type | notes |
+|---|---|---|
+| id | uuid PK | |
+| school_id | uuid FK NOT NULL | |
+| requested_by | uuid FK users.id | |
+| template_id | uuid FK | |
+| student_ids | jsonb | array of ids (nullable when class/section-based) |
+| class_id / section_id | uuid FK NULL | |
+| output_format | varchar(10) | `pdf` \| `png` \| `zip` |
+| layout | varchar(20) | `single` \| `a4-sheet` |
+| total | int | |
+| processed | int | worker updates as it renders |
+| status | id_card_job_status ENUM | `queued`, `running`, `done`, `failed` |
+| output_key | text | S3 key of the final bundle |
+| error | text | |
 
 ### `refresh_tokens`
 | column | type | notes |
@@ -230,11 +283,15 @@ Index: `(user_id, revoked_at)`.
 ## Enums
 
 ```sql
-CREATE TYPE user_role      AS ENUM ('super_admin', 'teacher');
-CREATE TYPE student_status AS ENUM ('draft', 'submitted', 'active', 'archived');
-CREATE TYPE sync_op        AS ENUM ('create', 'update', 'delete', 'photo_upload');
-CREATE TYPE sync_status    AS ENUM ('pending', 'uploading', 'uploaded', 'failed');
-CREATE TYPE gender         AS ENUM ('male', 'female', 'other');
+CREATE TYPE user_role              AS ENUM ('super_admin', 'teacher');
+CREATE TYPE student_status         AS ENUM ('draft', 'submitted', 'active', 'archived');
+CREATE TYPE sync_op                AS ENUM ('create', 'update', 'delete', 'photo_upload');
+CREATE TYPE sync_status            AS ENUM ('pending', 'uploading', 'uploaded', 'failed');
+CREATE TYPE gender                 AS ENUM ('male', 'female', 'other');
+CREATE TYPE template_module        AS ENUM ('student', 'employee');
+CREATE TYPE bulk_import_status     AS ENUM ('uploaded', 'validated', 'importing', 'completed', 'failed');
+CREATE TYPE bulk_import_row_status AS ENUM ('pending', 'valid', 'invalid', 'imported', 'failed');
+CREATE TYPE id_card_job_status     AS ENUM ('queued', 'running', 'done', 'failed');
 ```
 
 ## Search Extension

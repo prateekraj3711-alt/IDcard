@@ -9,6 +9,10 @@ import { StudentsPage } from '@/pages/StudentsPage';
 import { StudentProfilePage } from '@/pages/StudentProfilePage';
 import { IdCardsPage } from '@/pages/IdCardsPage';
 import { AnalyticsPage } from '@/pages/AnalyticsPage';
+import { BulkImportPage } from '@/pages/BulkImportPage';
+import { TemplatesPage } from '@/pages/TemplatesPage';
+import { TemplateEditorPage } from '@/pages/TemplateEditorPage';
+import { GenerateIdCardsPage } from '@/pages/GenerateIdCardsPage';
 
 export function App() {
   return (
@@ -21,7 +25,12 @@ export function App() {
         <Route path="/teachers" element={<TeachersPage />} />
         <Route path="/students" element={<StudentsPage />} />
         <Route path="/students/:id" element={<StudentProfilePage />} />
+        <Route path="/bulk-import" element={<BulkImportPage />} />
+        <Route path="/templates" element={<TemplatesPage />} />
+        <Route path="/templates/new" element={<TemplateEditorPage />} />
+        <Route path="/templates/:id" element={<TemplateEditorPage />} />
         <Route path="/id-cards" element={<IdCardsPage />} />
+        <Route path="/generate" element={<GenerateIdCardsPage />} />
         <Route path="/analytics" element={<AnalyticsPage />} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
