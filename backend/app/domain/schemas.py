@@ -47,7 +47,13 @@ class SchoolMini(ORMModel):
 class UserOut(ORMModel):
     id: UUID
     full_name: str
-    email: EmailStr
+    # Plain `str`, not `EmailStr`: signup with just a phone number synthesizes
+    # a placeholder address like `janardhan@teachers.stark.local`, and `.local`
+    # (plus `.invalid`, `.test`, `.example`) is a reserved TLD that
+    # email-validator rejects. Input validation still uses `EmailStr` on
+    # LoginRequest / TeacherCreate / TeacherSignupRequest, so real user
+    # emails are still validated on the way in.
+    email: str
     role: UserRole
     school: SchoolMini | None = None
 
