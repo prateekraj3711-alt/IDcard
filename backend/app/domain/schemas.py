@@ -62,10 +62,16 @@ class RefreshRequest(BaseModel):
 
 
 class TeacherSignupRequest(BaseModel):
-    """Public teacher self-registration. School code acts as the gate —
-    the super admin issues it out-of-band. Users need one of email or phone
-    (they can also log in with either)."""
-    school_code: str = Field(min_length=2, max_length=32)
+    """Public teacher self-registration.
+
+    School code is *optional* — a teacher can sign up standalone and pick
+    which school they're adding students to at the point of adding each
+    student. If provided, the teacher is scoped to that school and must
+    match it when creating students. If omitted, the teacher can pick any
+    active school per student.
+
+    Users need one of email or phone (they can also log in with either)."""
+    school_code: str | None = Field(default=None, max_length=32)
     full_name: str = Field(min_length=2, max_length=150)
     email: EmailStr | None = None
     phone: str | None = None
@@ -135,7 +141,10 @@ class SectionOut(ORMModel):
 
 
 class TeacherCreate(BaseModel):
-    school_id: UUID
+    """Super admin creates a teacher. School is optional — the teacher can
+    pick a school per student later. When set, the teacher is scoped to
+    that school (login lookups and student-add flow use it as default)."""
+    school_id: UUID | None = None
     full_name: str
     email: EmailStr
     phone: str | None = None

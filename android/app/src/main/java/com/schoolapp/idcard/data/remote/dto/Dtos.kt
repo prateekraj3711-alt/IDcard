@@ -46,7 +46,7 @@ data class RefreshRequestDto(val refresh_token: String, val device_id: String? =
 
 @Serializable
 data class TeacherSignupRequestDto(
-    val school_code: String,
+    val school_code: String? = null,
     val full_name: String,
     val email: String? = null,
     val phone: String? = null,

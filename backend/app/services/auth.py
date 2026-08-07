@@ -56,22 +56,23 @@ class AuthService:
 
     async def signup_teacher(
         self, req: TeacherSignupRequest, ip: str | None, ua: str | None
-    ) -> tuple[User, TokenPair, School]:
+    ) -> tuple[User, TokenPair, School | None]:
         if not req.email and not req.phone:
             raise Validation("either email or phone is required")
 
-        # Case-insensitive + whitespace-tolerant. Codes are supposed to be
-        # stored uppercase (SchoolCreate.pattern enforces ^[A-Z0-9-]+$), but
-        # teachers type them however they want on the sign-up screen — and
-        # even a single trailing space would have blown the exact-match up.
-        code = req.school_code.strip().upper()
-        school = (
-            await self.s.execute(
-                select(School).where(func.upper(School.code) == code)
-            )
-        ).scalar_one_or_none()
-        if school is None or school.deleted_at is not None or not school.is_active:
-            raise NotFound("school code not recognised")
+        # School code is optional — the teacher can sign up standalone and
+        # pick a school per student later. When provided we still validate
+        # case-insensitively + whitespace-tolerantly.
+        school: School | None = None
+        if req.school_code and req.school_code.strip():
+            code = req.school_code.strip().upper()
+            school = (
+                await self.s.execute(
+                    select(School).where(func.upper(School.code) == code)
+                )
+            ).scalar_one_or_none()
+            if school is None or school.deleted_at is not None or not school.is_active:
+                raise NotFound("school code not recognised")
 
         phone = _normalize_phone(req.phone) if req.phone else None
         if req.phone and phone is None:
@@ -94,8 +95,12 @@ class AuthService:
 
         username = await self._suggest_username(req.full_name)
         # Email is required by the model — synthesise a placeholder if the
-        # teacher signed up with just phone.
-        email = req.email or f"{username}@teachers.{school.code.lower()}.local"
+        # teacher signed up with just phone. Suffix depends on whether they
+        # attached a school code so the addresses stay unique-ish.
+        email = req.email or (
+            f"{username}@teachers.{school.code.lower()}.local" if school
+            else f"{username}@teachers.local"
+        )
 
         user = User(
             email=email,
@@ -103,7 +108,7 @@ class AuthService:
             password_hash=hash_password(req.password),
             full_name=req.full_name.strip(),
             role=UserRole.teacher,
-            school_id=school.id,
+            school_id=school.id if school else None,
             phone=phone,
             is_active=True,
         )

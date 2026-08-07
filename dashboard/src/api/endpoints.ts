@@ -36,7 +36,7 @@ export const TeachersApi = {
     return api.get<Teacher[]>('/teachers', { params }).then((r) => r.data);
   },
   create: (body: {
-    school_id: string; full_name: string; email: string; phone?: string;
+    school_id?: string; full_name: string; email: string; phone?: string;
     username?: string; password?: string;
   }) => api.post<TeacherCreated>('/teachers', body).then((r) => r.data),
   regeneratePassword: (id: string) =>

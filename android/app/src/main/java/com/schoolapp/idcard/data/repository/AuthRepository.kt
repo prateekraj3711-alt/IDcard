@@ -46,7 +46,7 @@ class AuthRepository @Inject constructor(
     }
 
     suspend fun signupTeacher(
-        schoolCode: String,
+        schoolCode: String?,
         fullName: String,
         email: String?,
         phone: String?,
@@ -55,7 +55,7 @@ class AuthRepository @Inject constructor(
     ): UserDto {
         val resp = api.signupTeacher(
             TeacherSignupRequestDto(
-                school_code = schoolCode,
+                school_code = schoolCode?.trim()?.ifBlank { null },
                 full_name = fullName,
                 email = email?.ifBlank { null },
                 phone = phone?.ifBlank { null },

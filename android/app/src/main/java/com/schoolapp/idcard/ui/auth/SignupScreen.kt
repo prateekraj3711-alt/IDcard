@@ -72,7 +72,7 @@ fun SignupScreen(
                 Text("Create your account", style = MaterialTheme.typography.headlineMedium)
                 Spacer(Modifier.height(4.dp))
                 Text(
-                    "Enter your school's code — your admin will have shared it. Fill in your details and pick a password.",
+                    "Fill in your details and pick a password. A school code isn't required — you can pick a school later when you add each student.",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -80,7 +80,9 @@ fun SignupScreen(
 
                 OutlinedTextField(
                     value = state.schoolCode, onValueChange = vm::onSchoolCode,
-                    label = { Text("School code") }, singleLine = true,
+                    label = { Text("School code (optional)") },
+                    supportingText = { Text("Leave blank to pick a school per student later") },
+                    singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
                 )
                 Spacer(Modifier.height(10.dp))

@@ -49,7 +49,7 @@ async def signup_teacher(
     ip = request.client.host if request.client else None
     user, pair, school = await AuthService(session).signup_teacher(req, ip, user_agent)
     school_out = (
-        SchoolMini(id=school.id, code=school.code, name=school.name) if school else None
+        SchoolMini(id=school.id, code=school.code, name=school.name) if school is not None else None
     )
     return LoginResponse(
         **pair.model_dump(),

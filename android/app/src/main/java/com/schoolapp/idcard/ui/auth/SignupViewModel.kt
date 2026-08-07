@@ -73,7 +73,6 @@ class SignupViewModel @Inject constructor(
     }
 
     private fun validate(s: SignupUiState): String? {
-        if (s.schoolCode.isBlank()) return "School code is required"
         if (s.fullName.length < 2) return "Enter your full name"
         if (s.email.isBlank() && s.phone.isBlank()) return "Provide either email or phone"
         if (s.password.length < 8) return "Password must be at least 8 characters"

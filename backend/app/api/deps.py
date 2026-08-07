@@ -63,8 +63,15 @@ def require_role(*allowed: UserRole) -> Callable[[CurrentUser], CurrentUser]:
 
 
 def ensure_same_school(user: CurrentUser, school_id: UUID) -> None:
-    """Enforce tenant isolation for non-super-admins."""
+    """Enforce tenant isolation for non-super-admins.
+
+    A teacher whose own ``school_id`` is ``NULL`` (registered standalone,
+    picking a school per student) can operate on any school — that is the
+    whole point of standalone teachers. Teachers who *are* pinned to a
+    school stay scoped to it."""
     if user.role == UserRole.super_admin:
+        return
+    if user.school_id is None:
         return
     if user.school_id != school_id:
         raise Forbidden("cross-school access denied")

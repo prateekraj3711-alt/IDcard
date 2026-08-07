@@ -81,11 +81,7 @@ export function TeachersPage() {
               <MenuItem key={s.id} value={s.id}>{s.code} — {s.name}</MenuItem>
             ))}
           </TextField>
-          <Button
-            variant="contained"
-            onClick={() => setOpen(true)}
-            disabled={(schools?.items?.length ?? 0) === 0}
-          >
+          <Button variant="contained" onClick={() => setOpen(true)}>
             Add teacher
           </Button>
         </Stack>
@@ -121,7 +117,7 @@ function AddTeacherDialog({
   open: boolean;
   onClose: () => void;
   onSubmit: (body: {
-    school_id: string;
+    school_id?: string;
     full_name: string;
     email: string;
     phone?: string;
@@ -133,24 +129,23 @@ function AddTeacherDialog({
   schools: School[];
   defaultSchoolId: string;
 }) {
-  // If the page filter is "All schools" we still need one to attach the new
-  // teacher to — default to the first available and let the operator change.
-  const [school_id, setSchoolId] = useState(defaultSchoolId || schools[0]?.id || '');
+  // School is now optional. If left blank the teacher can pick a school
+  // per student later, from the Android app.
+  const [school_id, setSchoolId] = useState(defaultSchoolId || '');
   const [full_name, setFullName] = useState('');
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
 
-  // Re-seed the school field when the dialog re-opens or the filter changes.
   useEffect(() => {
     if (open) {
-      setSchoolId(defaultSchoolId || schools[0]?.id || '');
+      setSchoolId(defaultSchoolId || '');
     }
-  }, [open, defaultSchoolId, schools]);
+  }, [open, defaultSchoolId]);
 
   const submit = () => onSubmit({
-    school_id,
+    school_id: school_id || undefined,
     full_name, email,
     phone: phone || undefined,
     username: username || undefined,
@@ -163,11 +158,13 @@ function AddTeacherDialog({
       <DialogContent>
         <Stack spacing={2} sx={{ mt: 1 }}>
           <TextField
-            select label="School" value={school_id}
+            select label="School (optional)" value={school_id}
             onChange={(e) => setSchoolId(e.target.value)}
-            required
-            helperText="Teacher will be scoped to this school"
+            helperText={schools.length === 0
+              ? "No schools yet — leave blank; teacher will pick per student"
+              : "Leave blank to let the teacher choose per student"}
           >
+            <MenuItem value=""><em>No school — pick later per student</em></MenuItem>
             {schools.map((s) => (
               <MenuItem key={s.id} value={s.id}>{s.code} — {s.name}</MenuItem>
             ))}
@@ -198,7 +195,7 @@ function AddTeacherDialog({
         <Button onClick={onClose}>Cancel</Button>
         <Button
           variant="contained" onClick={submit}
-          disabled={submitting || !school_id || !full_name || !email}
+          disabled={submitting || !full_name || !email}
         >
           {submitting ? 'Creating…' : 'Create'}
         </Button>
