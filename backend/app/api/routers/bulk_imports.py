@@ -1,3 +1,5 @@
+import os
+import tempfile
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, File, Form, UploadFile
@@ -23,6 +25,7 @@ SUPER = require_role(UserRole.super_admin)
 
 MAX_SPREADSHEET_BYTES = 20 * 1024 * 1024   # 20 MB
 MAX_PHOTO_ZIP_BYTES = 500 * 1024 * 1024    # 500 MB
+_CHUNK = 1024 * 1024                       # 1 MB stream chunks
 
 
 @router.post("", response_model=BulkImportPreview, status_code=201)
@@ -50,10 +53,32 @@ async def attach_photos(
     user: CurrentUser = Depends(SUPER),
     session: AsyncSession = Depends(get_session),
 ):
-    body = await file.read()
-    if len(body) > MAX_PHOTO_ZIP_BYTES:
-        raise Conflict("zip too large")
-    return await BulkImportService(session).attach_photos(user, import_id, body)
+    """
+    Stream the ZIP to a temp file on disk instead of reading it fully into
+    memory — a 90 MB ZIP × 4 gunicorn workers was blowing out the 512 MB
+    Render free-tier RAM cap. The service then reads one photo entry at a
+    time from the on-disk zip, uploads it, and discards the bytes.
+    """
+    tmp = tempfile.NamedTemporaryFile(delete=False, suffix=".zip")
+    tmp_path = tmp.name
+    try:
+        total = 0
+        while True:
+            chunk = await file.read(_CHUNK)
+            if not chunk:
+                break
+            total += len(chunk)
+            if total > MAX_PHOTO_ZIP_BYTES:
+                tmp.close()
+                raise Conflict("zip too large")
+            tmp.write(chunk)
+        tmp.close()
+        return await BulkImportService(session).attach_photos_from_path(user, import_id, tmp_path)
+    finally:
+        try:
+            os.unlink(tmp_path)
+        except OSError:
+            pass
 
 
 @router.post("/{import_id}/commit", response_model=BulkImportCommitResult)

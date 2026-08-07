@@ -121,15 +121,26 @@ class BulkImportService:
 
     # ----- photo folder -----------------------------------------------------
 
-    async def attach_photos(self, user: CurrentUser, import_id: UUID, zip_bytes: bytes) -> dict:
+    async def attach_photos_from_path(
+        self, user: CurrentUser, import_id: UUID, zip_path: str
+    ) -> dict:
+        """
+        Memory-frugal photo ingest. First pass builds a stem → ZipInfo index
+        (metadata only, ~100 bytes per entry). Second pass matches each row
+        to at most one entry, reads that single entry's bytes, uploads to R2,
+        and drops the reference — so peak memory stays around one photo, not
+        the whole archive.
+        """
         imp = await self._load(import_id, user)
         prefix = f"schools/{imp.school_id}/imports/{imp.id}/photos/"
 
         matched, uploaded = 0, 0
         client = get_s3_client()
+        bucket = settings.s3_bucket_photos
 
-        with zipfile.ZipFile(io.BytesIO(zip_bytes)) as zf:
-            stems: dict[str, tuple[str, bytes]] = {}
+        # Pass 1 — index entry names (no reads).
+        stems: dict[str, tuple[Any, str]] = {}
+        with zipfile.ZipFile(zip_path) as zf:
             for info in zf.infolist():
                 if info.is_dir():
                     continue
@@ -137,19 +148,21 @@ class BulkImportService:
                 if not name or not _is_image(name):
                     continue
                 stem = _normalize_stem(PurePosixPath(name).stem)
-                with zf.open(info) as f:
-                    stems[stem] = (name, f.read())
+                stems[stem] = (info, name)
 
-            rows = (
-                await self.s.execute(
-                    select(BulkImportRow).where(BulkImportRow.bulk_import_id == imp.id)
-                )
-            ).scalars().all()
+        rows = (
+            await self.s.execute(
+                select(BulkImportRow).where(BulkImportRow.bulk_import_id == imp.id)
+            )
+        ).scalars().all()
 
-            mapping = imp.column_mapping or {}
+        mapping = imp.column_mapping or {}
+        enrollment_key = _column_for_field(mapping, "enrollment_no")
+        photo_hint_key = _column_for_field(mapping, "photo_hint")
+
+        # Pass 2 — reopen the zip for streaming reads of matched entries.
+        with zipfile.ZipFile(zip_path) as zf:
             for row in rows:
-                enrollment_key = _column_for_field(mapping, "enrollment_no")
-                photo_hint_key = _column_for_field(mapping, "photo_hint")
                 enrollment = str(row.raw.get(enrollment_key, "")) if enrollment_key else ""
                 hint = str(row.raw.get(photo_hint_key, "")) if photo_hint_key else ""
 
@@ -162,10 +175,21 @@ class BulkImportService:
                 if found is None:
                     continue
 
-                filename, body = found
-                stem_key = _normalize_stem(enrollment or PurePosixPath(filename).stem or hint)
+                info, filename = found
+                stem_key = _normalize_stem(
+                    enrollment or PurePosixPath(filename).stem or hint
+                )
                 key = f"{prefix}{stem_key}.jpg"
-                client.put_object(Bucket=settings.s3_bucket_photos, Key=key, Body=body, ContentType="image/jpeg")
+
+                with zf.open(info) as f:
+                    body = f.read()
+                try:
+                    client.put_object(
+                        Bucket=bucket, Key=key, Body=body, ContentType="image/jpeg"
+                    )
+                finally:
+                    del body   # free ASAP before the next iteration
+
                 row.photo_storage_key = key
                 matched += 1
                 uploaded += 1
