@@ -7,7 +7,7 @@ import type {
 } from '@/types';
 
 export const AuthApi = {
-  login: (body: { school_code?: string; email?: string; username?: string; password: string }) =>
+  login: (body: { school_code?: string; email?: string; phone?: string; username?: string; password: string }) =>
     api.post<LoginResponse>('/auth/login', body).then((r) => r.data),
   logout: (refresh_token: string) => api.post('/auth/logout', { refresh_token }),
   me: () => api.get('/auth/me').then((r) => r.data),

@@ -5,8 +5,15 @@ import { AuthApi } from '@/api/endpoints';
 import { useAuth } from '@/auth/store';
 import { BRAND_NAME, APP_TAGLINE } from '@/theme';
 
+function classifyIdentifier(raw: string): { email?: string; phone?: string } {
+  const s = raw.trim();
+  if (!s) return {};
+  if (s.includes('@')) return { email: s };
+  return { phone: s };
+}
+
 export function LoginPage() {
-  const [email, setEmail] = useState('');
+  const [identifier, setIdentifier] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -17,7 +24,8 @@ export function LoginPage() {
     e.preventDefault();
     setLoading(true); setError(null);
     try {
-      const resp = await AuthApi.login({ email, password });
+      const { email, phone } = classifyIdentifier(identifier);
+      const resp = await AuthApi.login({ email, phone, password });
       setTokens(resp.access_token, resp.refresh_token);
       setUser(resp.user);
       nav('/dashboard');
@@ -78,13 +86,13 @@ export function LoginPage() {
             <form onSubmit={submit}>
               <Stack spacing={2}>
                 <TextField
-                  label="Work email"
-                  type="email"
-                  autoComplete="email"
+                  label="Email or phone"
+                  autoComplete="username"
                   autoFocus
                   fullWidth
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
+                  value={identifier}
+                  onChange={(e) => setIdentifier(e.target.value)}
+                  placeholder="you@company.com or +91 98123 45678"
                   required
                 />
                 <TextField

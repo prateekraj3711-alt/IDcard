@@ -51,6 +51,8 @@ export function AdminsPage() {
   const columns: GridColDef[] = [
     { field: 'full_name', headerName: 'Name', flex: 1 },
     { field: 'email', headerName: 'Email', flex: 1 },
+    { field: 'phone', headerName: 'Phone', width: 170,
+      valueGetter: (v) => v ?? '—' },
     {
       field: 'you', headerName: '', width: 80, sortable: false,
       renderCell: (p) => p.row.id === user?.id
@@ -175,8 +177,18 @@ function AddAdminDialog({
             Super admins have full platform access — creating schools, teachers, templates, generating ID cards, and adding or removing other admins.
           </Alert>
           <TextField label="Full name" value={full_name} onChange={(e) => setFullName(e.target.value)} required />
-          <TextField label="Email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
-          <TextField label="Phone (optional)" value={phone} onChange={(e) => setPhone(e.target.value)} />
+          <TextField
+            label="Email" type="email"
+            value={email} onChange={(e) => setEmail(e.target.value)}
+            helperText="Primary login identifier"
+            required
+          />
+          <TextField
+            label="Phone (optional)"
+            value={phone} onChange={(e) => setPhone(e.target.value)}
+            helperText="If set, this admin can also sign in using their phone number"
+            placeholder="+91 98123 45678"
+          />
           <TextField
             label="Password (optional)"
             helperText="Leave blank to auto-generate a strong 14-char password"

@@ -46,6 +46,7 @@ export interface Admin {
   id: string;
   full_name: string;
   email: string;
+  phone?: string | null;
   role: 'super_admin';
   is_active: boolean;
   last_login_at?: string | null;

@@ -38,6 +38,7 @@ async def create_admin(
         id=row.id,
         full_name=row.full_name,
         email=row.email,
+        phone=row.phone,
         role=row.role,
         is_active=row.is_active,
         last_login_at=row.last_login_at,

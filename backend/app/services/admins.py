@@ -6,6 +6,7 @@ import string
 from datetime import datetime, timezone
 from uuid import UUID
 
+import phonenumbers
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -14,6 +15,18 @@ from app.core.errors import Conflict, Forbidden, NotFound
 from app.core.security import hash_password
 from app.domain.schemas import AdminCreate, GeneratedCredentials
 from app.infrastructure.db.models import User, UserRole
+
+
+def _normalize_phone(raw: str | None, default_region: str = "IN") -> str | None:
+    if not raw:
+        return None
+    try:
+        parsed = phonenumbers.parse(raw, default_region)
+        if not phonenumbers.is_valid_number(parsed):
+            return None
+        return phonenumbers.format_number(parsed, phonenumbers.PhoneNumberFormat.E164)
+    except Exception:
+        return None
 
 
 class AdminService:
@@ -35,15 +48,27 @@ class AdminService:
         return list(rows)
 
     async def create(self, data: AdminCreate) -> tuple[User, GeneratedCredentials]:
-        existing = (
+        # Normalize phone to E.164 up front so all lookups compare like-for-like.
+        phone = _normalize_phone(data.phone) if data.phone else None
+        if data.phone and phone is None:
+            raise Conflict("phone number is not valid")
+
+        # Email is required by the model; phone is an optional secondary
+        # identifier admins can log in with in addition to email.
+        existing_email = (
             await self.s.execute(select(User).where(User.email == data.email))
         ).scalar_one_or_none()
-        if existing:
+        if existing_email:
             raise Conflict("email already in use")
 
+        if phone:
+            existing_phone = (
+                await self.s.execute(select(User).where(User.phone == phone))
+            ).scalar_one_or_none()
+            if existing_phone:
+                raise Conflict("phone already in use")
+
         password = data.password or self._generate_password()
-        # For admins the username defaults to the email (used only for display
-        # and per-admin uniqueness); email is the login identifier.
         username = data.username or await self._suggest_username(data.full_name)
 
         user = User(
@@ -53,13 +78,13 @@ class AdminService:
             full_name=data.full_name,
             role=UserRole.super_admin,
             school_id=None,
-            phone=data.phone,
+            phone=phone,
             is_active=True,
         )
         self.s.add(user)
         await self.s.commit()
         await self.s.refresh(user)
-        return user, GeneratedCredentials(username=email_or(user, username), password=password)
+        return user, GeneratedCredentials(username=user.email, password=password)
 
     async def regenerate_password(self, admin_id: UUID, actor: CurrentUser) -> GeneratedCredentials:
         user = await self._require_admin(admin_id)
@@ -117,7 +142,3 @@ class AdminService:
             + "".join(c for c in string.digits if c not in "01")
         )
         return "".join(secrets.choice(alphabet) for _ in range(length))
-
-
-def email_or(user: User, fallback: str) -> str:
-    return user.email or fallback

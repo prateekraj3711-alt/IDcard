@@ -26,6 +26,7 @@ class LoginRequest(BaseModel):
     school_code: str | None = None
     username: str | None = None
     email: EmailStr | None = None
+    phone: str | None = None
     password: str = Field(min_length=6, max_length=128)
     device_id: str | None = Field(default=None, max_length=128)
 
@@ -164,6 +165,7 @@ class AdminOut(ORMModel):
     id: UUID
     full_name: str
     email: EmailStr
+    phone: str | None = None
     role: UserRole
     is_active: bool
     last_login_at: datetime | None = None

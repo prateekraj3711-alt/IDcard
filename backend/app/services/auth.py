@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 from datetime import datetime, timedelta, timezone
 from uuid import UUID
 
@@ -62,6 +63,15 @@ class AuthService:
     async def _find_user(self, req: LoginRequest) -> User | None:
         if req.email:
             return (await self.s.execute(select(User).where(User.email == req.email))).scalar_one_or_none()
+        if req.phone:
+            candidates = _phone_candidates(req.phone)
+            for candidate in candidates:
+                found = (
+                    await self.s.execute(select(User).where(User.phone == candidate))
+                ).scalar_one_or_none()
+                if found is not None:
+                    return found
+            return None
         if req.username and req.school_code:
             school = (
                 await self.s.execute(select(School).where(School.code == req.school_code))
@@ -101,3 +111,27 @@ class AuthService:
             refresh_token=raw,
             expires_in=settings.access_token_ttl_seconds,
         )
+
+
+def _phone_candidates(raw: str) -> list[str]:
+    """
+    Produce a small set of candidate stored formats for a user-typed phone
+    number, so someone who has "+919812345678" stored can still log in when
+    they type "9812345678" or "919812345678" or "+91 98123 45678".
+    """
+    digits = re.sub(r"\D", "", raw or "")
+    if not digits:
+        return []
+    out: list[str] = []
+    def add(v: str) -> None:
+        if v and v not in out:
+            out.append(v)
+    add(raw.strip())
+    add("+" + digits)
+    add(digits)
+    if len(digits) == 10:
+        add("+91" + digits)
+    if digits.startswith("91") and len(digits) == 12:
+        add("+" + digits)
+        add(digits[2:])
+    return out
