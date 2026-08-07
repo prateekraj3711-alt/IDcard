@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import csv
 import io
+import json
 import re
 import zipfile
 from datetime import date, datetime
@@ -228,8 +229,19 @@ class BulkImportService:
             return existing.id
 
         imported, failed = 0, 0
+
+        # Every JSONB write below routes through _json_safe. On top of that,
+        # disable autoflush across the loop so we never surprise-flush a
+        # half-populated ORM state mid-iteration (which was what generated
+        # the confusing "date is not JSON serializable" trace even after
+        # rows were sanitized).
+        self.s.autoflush = False
+
         for row in rows:
-            mapped, errors = self._map_row(row.raw, mapping)
+            # Defensive copy — if the persisted row.raw was somehow non-JSON-
+            # native (older data or a driver quirk), sanitize before mapping.
+            safe_raw = _json_safe(row.raw) if row.raw else {}
+            mapped, errors = self._map_row(safe_raw, mapping)
             row.mapped = _json_safe(mapped)
             if errors:
                 row.status = BulkImportRowStatus.invalid
@@ -506,21 +518,23 @@ def _iso_to_date(value: Any):
         return None
 
 
+def _json_default(o: Any) -> Any:
+    """Fallback used by json.dumps for anything non-serializable."""
+    if isinstance(o, (datetime, date)):
+        return o.isoformat()
+    if isinstance(o, UUID):
+        return str(o)
+    return str(o)
+
+
 def _json_safe(obj: Any) -> Any:
-    """Recursively normalize a value for JSONB storage — datetime/date become
-    ISO strings, UUIDs become their str form, everything else passes through.
-    Defensive: any code path that leaves a non-JSON-native value in a dict
-    that lands in a JSONB column will fail the transaction and poison the
-    session. This guarantees we never trip that."""
-    if isinstance(obj, dict):
-        return {k: _json_safe(v) for k, v in obj.items()}
-    if isinstance(obj, (list, tuple)):
-        return [_json_safe(v) for v in obj]
-    if isinstance(obj, datetime):
-        return obj.isoformat()
-    if isinstance(obj, date):
-        return obj.isoformat()
-    return obj
+    """
+    Force any value through a JSON round-trip so nothing non-serializable
+    (date, datetime, UUID, Decimal, custom types, ...) can reach a JSONB
+    column. This is deliberately heavy-handed — the alternative was chasing
+    per-field bugs where a stray date snuck in and poisoned the session.
+    """
+    return json.loads(json.dumps(obj, default=_json_default))
 
 
 def _is_image(name: str) -> bool:
