@@ -1,0 +1,31 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+.env
+
+# Node
+node_modules/
+dist/
+build/
+.vite/
+.cache/
+
+# Android / Gradle
+.gradle/
+local.properties
+build/
+*.iml
+*.hprof
+.idea/
+captures/
+.externalNativeBuild/
+.cxx/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Editor
+.vscode/

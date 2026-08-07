@@ -1,0 +1,4 @@
+-keepattributes Signature, InnerClasses, EnclosingMethod
+-keepclassmembers class **$$serializer { *; }
+-keep class kotlinx.serialization.** { *; }
+-keep class com.schoolapp.idcard.data.remote.dto.** { *; }

@@ -1,0 +1,32 @@
+from uuid import UUID
+
+from fastapi import APIRouter, Depends, Query
+from fastapi.responses import Response
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.api.deps import CurrentUser, get_current_user
+from app.domain.schemas import IdCardGenerateRequest, IdCardJob
+from app.infrastructure.db.session import get_session
+from app.services.id_cards import IdCardService
+
+router = APIRouter(prefix="/id-cards", tags=["id-cards"])
+
+
+@router.post("/generate", response_model=IdCardJob, status_code=202)
+async def generate(
+    body: IdCardGenerateRequest,
+    user: CurrentUser = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+):
+    return await IdCardService(session).generate(body, user)
+
+
+@router.get("/{student_id}/preview")
+async def preview(
+    student_id: UUID,
+    template_id: UUID = Query(...),
+    user: CurrentUser = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+):
+    png = await IdCardService(session).render_preview(student_id, template_id, user)
+    return Response(content=png, media_type="image/png")
