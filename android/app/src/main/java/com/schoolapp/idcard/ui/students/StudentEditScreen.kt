@@ -152,6 +152,58 @@ fun StudentEditScreen(
             }
 
             Spacer(Modifier.height(16.dp))
+            // School picker — visible only for teachers who signed up
+            // standalone (no school pinned to their account). Pinned teachers
+            // see a read-only chip so they know which school this student
+            // will be attached to.
+            if (state.schoolPickerRequired) {
+                Text("School", style = MaterialTheme.typography.titleSmall)
+                Spacer(Modifier.height(8.dp))
+                var expanded by remember { mutableStateOf(false) }
+                ExposedDropdownMenuBox(
+                    expanded = expanded,
+                    onExpandedChange = { expanded = !expanded },
+                ) {
+                    OutlinedTextField(
+                        value = state.schoolLabel.ifBlank { "Pick a school" },
+                        onValueChange = { },
+                        readOnly = true,
+                        label = { Text("School *") },
+                        trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
+                        modifier = Modifier
+                            .menuAnchor()
+                            .fillMaxWidth(),
+                    )
+                    ExposedDropdownMenu(
+                        expanded = expanded,
+                        onDismissRequest = { expanded = false },
+                    ) {
+                        if (state.schools.isEmpty()) {
+                            DropdownMenuItem(
+                                text = { Text("No schools available yet") },
+                                onClick = { expanded = false },
+                                enabled = false,
+                            )
+                        }
+                        state.schools.forEach { s ->
+                            DropdownMenuItem(
+                                text = { Text("${s.code} — ${s.name}") },
+                                onClick = {
+                                    vm.onSchool(s.id)
+                                    expanded = false
+                                },
+                            )
+                        }
+                    }
+                }
+                Spacer(Modifier.height(16.dp))
+            } else if (state.schoolLabel.isNotBlank()) {
+                AssistChip(
+                    onClick = { },
+                    label = { Text("School: ${state.schoolLabel}") },
+                )
+                Spacer(Modifier.height(16.dp))
+            }
             Text("Personal details", style = MaterialTheme.typography.titleSmall)
             Spacer(Modifier.height(8.dp))
             OutlinedTextField(state.name, vm::onName, label = { Text("Full name *") }, modifier = Modifier.fillMaxWidth())

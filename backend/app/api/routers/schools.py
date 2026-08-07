@@ -1,15 +1,35 @@
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, Query
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.deps import CurrentUser, require_role
-from app.domain.schemas import Page, SchoolCreate, SchoolOut, SchoolUpdate
-from app.infrastructure.db.models import UserRole
+from app.api.deps import CurrentUser, get_current_user, require_role
+from app.domain.schemas import Page, SchoolCreate, SchoolMini, SchoolOut, SchoolUpdate
+from app.infrastructure.db.models import School, UserRole
 from app.infrastructure.db.session import get_session
 from app.services.schools import SchoolService
 
 router = APIRouter(prefix="/schools", tags=["schools"])
+
+
+@router.get("/available", response_model=list[SchoolMini])
+async def list_available_schools(
+    _: CurrentUser = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+):
+    """Any signed-in user (super admin or teacher) can enumerate the active
+    schools. Returns only the identity trio — id, code, name — no PII. Used
+    by the Android app so a standalone teacher can pick which school a
+    student belongs to."""
+    rows = (
+        await session.execute(
+            select(School)
+            .where(School.deleted_at.is_(None), School.is_active.is_(True))
+            .order_by(School.name.asc())
+        )
+    ).scalars().all()
+    return [SchoolMini(id=s.id, code=s.code, name=s.name) for s in rows]
 
 
 @router.get("", response_model=Page)

@@ -16,6 +16,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CameraAlt
+import androidx.compose.material.icons.filled.Cameraswitch
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.*
@@ -48,6 +49,9 @@ fun CameraCaptureScreen(
 
     var capturedFile by remember { mutableStateOf<File?>(null) }
     var capturedUri by remember { mutableStateOf<Uri?>(null) }
+    // Default to the back camera (better sensor for ID card headshots).
+    // Toggle switches between back and front for selfie enrollment.
+    var useFrontCamera by remember { mutableStateOf(false) }
     val state by vm.state.collectAsState()
 
     // Runtime CAMERA permission. Declared in the manifest but Android 6+
@@ -98,17 +102,34 @@ fun CameraCaptureScreen(
             AndroidView(
                 factory = { ctx ->
                     PreviewView(ctx).also { preview ->
-                        bindCamera(ctx, lifecycleOwner, preview, imageCapture)
+                        bindCamera(ctx, lifecycleOwner, preview, imageCapture, useFrontCamera)
                     }
+                },
+                update = { preview ->
+                    // Re-bind whenever the selected lens flips; ProcessCameraProvider
+                    // is a singleton so this is cheap.
+                    bindCamera(preview.context, lifecycleOwner, preview, imageCapture, useFrontCamera)
                 },
                 modifier = Modifier.fillMaxSize(),
             )
+            // Flip-camera pill top-right.
+            IconButton(
+                onClick = { useFrontCamera = !useFrontCamera },
+                modifier = Modifier.align(Alignment.TopEnd).padding(16.dp),
+            ) {
+                Icon(
+                    Icons.Filled.Cameraswitch,
+                    contentDescription = if (useFrontCamera) "Switch to back camera" else "Switch to front camera",
+                    tint = Color.White,
+                )
+            }
             Column(
                 modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 24.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
                 Text(
-                    "Frame the candidate's face in the centre",
+                    if (useFrontCamera) "Selfie mode — front camera"
+                    else "Frame the candidate's face in the centre",
                     color = Color.White,
                     style = MaterialTheme.typography.bodyMedium,
                 )
@@ -180,14 +201,27 @@ private fun bindCamera(
     owner: androidx.lifecycle.LifecycleOwner,
     preview: PreviewView,
     imageCapture: ImageCapture,
+    useFrontCamera: Boolean = false,
 ) {
     val future = ProcessCameraProvider.getInstance(ctx)
     future.addListener({
         val provider = future.get()
         val previewUseCase = Preview.Builder().build().also { it.setSurfaceProvider(preview.surfaceProvider) }
-        val selector = CameraSelector.DEFAULT_BACK_CAMERA
+        val selector = if (useFrontCamera) CameraSelector.DEFAULT_FRONT_CAMERA
+        else CameraSelector.DEFAULT_BACK_CAMERA
         provider.unbindAll()
-        provider.bindToLifecycle(owner, selector, previewUseCase, imageCapture)
+        try {
+            provider.bindToLifecycle(owner, selector, previewUseCase, imageCapture)
+        } catch (_: Exception) {
+            // Some devices don't expose a front camera — fall back to whichever
+            // is available so we never leave the user with a black preview.
+            provider.bindToLifecycle(
+                owner,
+                CameraSelector.DEFAULT_BACK_CAMERA,
+                previewUseCase,
+                imageCapture,
+            )
+        }
     }, ContextCompat.getMainExecutor(ctx))
 }
 
