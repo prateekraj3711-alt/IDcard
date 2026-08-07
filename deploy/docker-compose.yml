@@ -1,0 +1,178 @@
+# Stark ID — self-hosted production stack.
+#
+# Runs the entire platform (Postgres + MinIO + Redis + FastAPI backend +
+# React dashboard + Caddy TLS/reverse-proxy) on a single Linux host with
+# nothing outside your machine. Bring up with:
+#
+#     cp .env.example .env
+#     # edit .env — set POSTGRES_PASSWORD, JWT_SECRET, MINIO_ROOT_PASSWORD,
+#     # ADMIN_EMAIL, ADMIN_PASSWORD, DOMAIN, etc.
+#     docker compose up -d
+#
+# On first boot Caddy fetches Let's Encrypt certificates for $DOMAIN and
+# starts serving the dashboard at https://$DOMAIN and the API at
+# https://$DOMAIN/api.
+#
+# Nothing here talks to Neon, Supabase, R2, Render, or Vercel. Every byte
+# lives on your host.
+
+name: stark-id
+
+services:
+  # ---------------------- data plane ----------------------
+
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-idcard}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+      POSTGRES_DB: ${POSTGRES_DB:-idcard}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-idcard}"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: ["redis-server", "--save", "60", "1", "--appendonly", "yes"]
+    volumes:
+      - redisdata:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
+  minio:
+    image: minio/minio:latest
+    restart: unless-stopped
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:?set MINIO_ROOT_PASSWORD in .env}
+    volumes:
+      - miniodata:/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/ready"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+
+  # One-shot bucket-creation container. Exits after mc mb finishes.
+  createbuckets:
+    image: minio/mc:latest
+    depends_on:
+      minio:
+        condition: service_healthy
+    entrypoint: >
+      /bin/sh -c "
+      mc alias set local http://minio:9000
+        ${MINIO_ROOT_USER:-minioadmin}
+        ${MINIO_ROOT_PASSWORD};
+      mc mb -p local/${S3_BUCKET_PHOTOS:-idcard-photos}   || true;
+      mc mb -p local/${S3_BUCKET_IDCARDS:-idcard-cards}   || true;
+      mc anonymous set download local/${S3_BUCKET_PHOTOS:-idcard-photos}  || true;
+      "
+    restart: "no"
+
+  # ---------------------- application ---------------------
+
+  backend:
+    build:
+      context: ../backend
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      # Database
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-idcard}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-idcard}
+      # Storage — S3-compatible endpoint served by MinIO in the same compose network
+      S3_ENDPOINT_URL: http://minio:9000
+      S3_REGION: us-east-1
+      S3_ACCESS_KEY: ${MINIO_ROOT_USER:-minioadmin}
+      S3_SECRET_KEY: ${MINIO_ROOT_PASSWORD}
+      S3_BUCKET_PHOTOS: ${S3_BUCKET_PHOTOS:-idcard-photos}
+      S3_BUCKET_IDCARDS: ${S3_BUCKET_IDCARDS:-idcard-cards}
+      S3_USE_PATH_STYLE: "true"
+      # Public URL that presigned links resolve to from the browser.
+      # If left blank the app derives it from S3_ENDPOINT_URL.
+      S3_PUBLIC_URL: ${S3_PUBLIC_URL:-}
+      # Redis (rate limiter). Optional; leave empty to fail-open.
+      REDIS_URL: redis://redis:6379/0
+      # App
+      JWT_SECRET: ${JWT_SECRET:?set JWT_SECRET in .env — use `openssl rand -hex 32`}
+      APP_ENV: production
+      CORS_ORIGINS: https://${DOMAIN:?set DOMAIN in .env},http://localhost:5173
+      # Optional one-shot super admin creation on first boot.
+      INITIAL_ADMIN_EMAIL: ${ADMIN_EMAIL:-}
+      INITIAL_ADMIN_PASSWORD: ${ADMIN_PASSWORD:-}
+      INITIAL_ADMIN_FULL_NAME: ${ADMIN_FULL_NAME:-Site Admin}
+      WEB_CONCURRENCY: "2"
+    expose:
+      - "8000"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/v1/healthz"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  # Dashboard is a static Vite build. We build it with a Node image and copy
+  # the dist into a volume that Caddy serves. No runtime process needed.
+  dashboard-build:
+    image: node:20-alpine
+    working_dir: /work
+    volumes:
+      - ../dashboard:/work:ro
+      - dashboarddist:/out
+    environment:
+      VITE_API_BASE_URL: https://${DOMAIN}/api/v1
+    entrypoint: >
+      /bin/sh -c "
+      cp -r /work /tmp/build &&
+      cd /tmp/build &&
+      npm install --no-audit --no-fund &&
+      npm run build &&
+      rm -rf /out/* &&
+      cp -r dist/. /out/
+      "
+    restart: "no"
+
+  # ---------------------- edge ----------------------------
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    depends_on:
+      backend:
+        condition: service_healthy
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      DOMAIN: ${DOMAIN}
+      ACME_EMAIL: ${ACME_EMAIL:?set ACME_EMAIL for Let's Encrypt}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - dashboarddist:/srv/dashboard:ro
+      - caddydata:/data
+      - caddyconfig:/config
+
+volumes:
+  pgdata:
+  redisdata:
+  miniodata:
+  dashboarddist:
+  caddydata:
+  caddyconfig:

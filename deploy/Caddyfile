@@ -1,0 +1,45 @@
+# Caddy config for a Stark ID self-hosted deployment.
+#
+# Serves:
+#   https://$DOMAIN/            → the React dashboard (static files)
+#   https://$DOMAIN/api/*       → the FastAPI backend
+#   https://$DOMAIN/storage/*   → MinIO's S3 API (optional; only exposed if
+#                                  you want direct browser reads of R2-style
+#                                  presigned URLs. Comment out to keep
+#                                  MinIO fully internal.)
+#
+# TLS certificates are provisioned automatically from Let's Encrypt using
+# the ACME_EMAIL env var. If $DOMAIN is unset, Caddy binds to :80 only.
+
+{
+	email {$ACME_EMAIL}
+}
+
+{$DOMAIN} {
+	encode gzip zstd
+
+	# API — routed to the FastAPI container. Prefix intentionally not
+	# stripped: the app already lives under /api/v1.
+	handle_path /api/* {
+		reverse_proxy backend:8000
+	}
+	@apiRoot path /api /api/*
+	handle @apiRoot {
+		reverse_proxy backend:8000
+	}
+
+	# S3 (MinIO) — only if the browser needs to hit signed URLs directly.
+	# Uncomment if you rely on the pattern of presigned PUTs/GETs from the
+	# dashboard or Android app.
+	# handle_path /storage/* {
+	# 	reverse_proxy minio:9000
+	# }
+
+	# Everything else = the React SPA. History-mode fallback so deep links
+	# work.
+	handle {
+		root * /srv/dashboard
+		try_files {path} /index.html
+		file_server
+	}
+}
