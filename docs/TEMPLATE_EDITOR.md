@@ -11,6 +11,17 @@ Every template belongs to one **module**:
 
 The generate UI shows templates filtered by module — an ID card job for students can only pick from student templates.
 
+## Ways to Start a Template
+
+1. **From scratch** — click *New template* on the Templates page and build with the palette.
+2. **Import from JSON** — round-trip a template between orgs. `GET /templates/{id}/export` produces the JSON on one side; `POST /templates/import` accepts it on the other. Signed URLs are stripped from the export — only `storage_key` references survive so the target org must have equivalent asset access, or replace the background image after import.
+3. **Import from image (PNG / JPG)** — upload a rendered mock of an existing card. The server stores it under `templates/{id}/background.<ext>` in the id-cards bucket and creates a template whose `layout_json.background_image` references that key. In the editor:
+   - The image renders as the bottom layer of the canvas at full card size.
+   - It is **locked by default** so drag / transform gestures can't move it.
+   - The BG chip in the toolbar toggles the lock — unlock to reposition, resize, or replace; lock again once you're happy.
+   - Field placeholders sit on top and remain fully editable.
+4. **Duplicate + edit** — export any existing template, tweak the JSON, import as a new template.
+
 ## Editor UX
 
 - **Left palette** — field catalog for the selected module. Click a field to add it to the canvas. Kinds: `text`, `image`, `qr`, `barcode`.
@@ -25,6 +36,10 @@ The generate UI shows templates filtered by module — an ID card job for studen
   "width": 340,               // px on canvas
   "height": 214,
   "background": "#ffffff",
+  "background_image": {        // optional — set by image import
+    "storage_key": "templates/{id}/background.png",
+    "locked": true              // when true, editor gestures are disabled on it
+  },
   "elements": [
     {
       "id": "01H…",

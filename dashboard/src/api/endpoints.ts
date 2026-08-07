@@ -54,6 +54,17 @@ export const TemplatesApi = {
   update: (id: string, body: Partial<Template>) => api.patch<Template>(`/templates/${id}`, body).then((r) => r.data),
   fieldCatalog: (module: TemplateModule) =>
     api.get<{ module: TemplateModule; fields: FieldCatalogEntry[] }>('/templates/fields/catalog', { params: { module } }).then((r) => r.data),
+  import: (opts: { file: File; name: string; module: TemplateModule; school_id?: string }) => {
+    const fd = new FormData();
+    fd.append('file', opts.file);
+    fd.append('name', opts.name);
+    fd.append('module', opts.module);
+    if (opts.school_id) fd.append('school_id', opts.school_id);
+    return api.post<{ template: Template; source: 'json' | 'image' }>('/templates/import', fd, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    }).then((r) => r.data);
+  },
+  exportUrl: (id: string) => `/api/v1/templates/${id}/export`,
 };
 
 export const IdCardJobsApi = {

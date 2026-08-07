@@ -99,10 +99,17 @@ export interface Template {
   created_at: string;
 }
 
+export interface TemplateBackgroundImage {
+  storage_key: string;
+  url?: string;              // signed URL populated by the server on read
+  locked?: boolean;
+}
+
 export interface TemplateLayout {
   width: number;
   height: number;
   background: string;
+  background_image?: TemplateBackgroundImage;
   elements: TemplateElement[];
 }
 
@@ -123,7 +130,10 @@ export interface TemplateElement {
   align?: 'left' | 'center' | 'right';
   text?: string;            // static text (for header, "STUDENT ID CARD", etc.)
   src?: string;             // static image data-uri / URL
+  storage_key?: string;     // S3 key for uploaded imagery (resolved to `url`)
+  url?: string;             // signed URL from server (read-only)
   rotation?: number;
+  locked?: boolean;         // if true, cannot be dragged/transformed in the editor
 }
 
 export interface FieldCatalogEntry {

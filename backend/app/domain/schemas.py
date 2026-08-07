@@ -396,6 +396,12 @@ class TemplateFieldCatalog(BaseModel):
     fields: list[dict[str, str]]
 
 
+class TemplateImportResult(BaseModel):
+    """Response body for POST /templates/import."""
+    template: "TemplateOut"
+    source: str      # "json" | "image"
+
+
 # --- Bulk import -----------------------------------------------------------
 
 # Sensible defaults matching the sample sheet in the spec image.

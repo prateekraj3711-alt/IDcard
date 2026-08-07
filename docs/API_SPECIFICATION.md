@@ -284,6 +284,27 @@ Templates are versioned per-module (`student` or `employee`) card designs. Field
 ### GET `/templates/fields/catalog?module=student|employee`
 Returns the binding vocabulary the editor should render in its palette.
 
+### POST `/templates/import` (multipart)
+Import a template from either a JSON export or a raster image (PNG/JPG).
+
+Form fields:
+- `file` — the .json / .png / .jpg (≤ 10 MB)
+- `name` — display name
+- `module` — `student` | `employee`
+- `school_id` — optional; leave blank for system-wide
+
+Behavior:
+- JSON — parses `layout_json` (accepts either a wrapper `{"layout_json": {...}}` or the bare layout object), copies `paper_size` / `card_*_mm` / `html` / `css` when present, creates the template.
+- Image — uploads to `s3://idcard-cards/templates/{id}/background.<ext>` and creates a template whose `layout_json.background_image` references it. The image is placed on the canvas at full card size and is **locked by default** so it can serve as an editable background layer.
+
+Response 201:
+```json
+{ "source": "image", "template": { "id": "…", "module": "student", "name": "…", "layout_json": { ... } } }
+```
+
+### GET `/templates/{id}/export`
+Returns the template as a portable JSON export (signed URLs stripped, storage keys preserved) suitable for re-importing.
+
 ## ID Card Jobs (bulk generation)
 
 ### POST `/id-card-jobs`

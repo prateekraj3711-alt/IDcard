@@ -1,19 +1,22 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
-  Box, Button, Card, CardContent, Divider, IconButton, MenuItem, Paper, Stack, TextField,
-  ToggleButton, ToggleButtonGroup, Tooltip, Typography,
+  Box, Button, Card, CardContent, Chip, Divider, FormControlLabel, IconButton, MenuItem, Paper,
+  Stack, Switch, TextField, ToggleButton, ToggleButtonGroup, Tooltip, Typography,
 } from '@mui/material';
 import DeleteIcon from '@mui/icons-material/Delete';
 import SaveIcon from '@mui/icons-material/Save';
+import LockIcon from '@mui/icons-material/Lock';
+import LockOpenIcon from '@mui/icons-material/LockOpen';
 import { Stage, Layer, Rect, Text as KText, Image as KImage, Transformer } from 'react-konva';
+import useImage from 'use-image';
 import Konva from 'konva';
 import { TemplatesApi } from '@/api/endpoints';
 import type { FieldCatalogEntry, Template, TemplateElement, TemplateLayout, TemplateModule } from '@/types';
 
-const DEFAULT_CARD_W = 340;   // px on canvas ~= 86mm
-const DEFAULT_CARD_H = 214;   // px ~= 54mm
+const DEFAULT_CARD_W = 340;
+const DEFAULT_CARD_H = 214;
 const PALETTE_KIND_COLOR: Record<string, string> = {
   text: '#EAF1FF', image: '#FFF4E0', qr: '#E7F8EA', barcode: '#F0E7FA',
 };
@@ -52,7 +55,15 @@ export function TemplateEditorPage() {
 
   const save = useMutation({
     mutationFn: () => {
-      const body: Partial<Template> = { name, module, layout_json: layout };
+      // Strip the resolved `url` fields before persisting — server rehydrates on read.
+      const clean: TemplateLayout = {
+        ...layout,
+        background_image: layout.background_image
+          ? { storage_key: layout.background_image.storage_key, locked: layout.background_image.locked ?? true }
+          : undefined,
+        elements: layout.elements.map(({ url: _u, ...e }) => e),
+      };
+      const body: Partial<Template> = { name, module, layout_json: clean };
       return isNew ? TemplatesApi.create(body) : TemplatesApi.update(id!, body);
     },
     onSuccess: (t) => {
@@ -93,6 +104,16 @@ export function TemplateEditorPage() {
   const removeElement = (elId: string) => {
     setLayout((l) => ({ ...l, elements: l.elements.filter((e) => e.id !== elId) }));
     setSelectedId(null);
+  };
+
+  const toggleBackgroundLock = () => {
+    setLayout((l) => l.background_image
+      ? { ...l, background_image: { ...l.background_image, locked: !l.background_image.locked } }
+      : l);
+  };
+
+  const removeBackground = () => {
+    setLayout((l) => ({ ...l, background_image: undefined }));
   };
 
   const selectedEl = layout.elements.find((e) => e.id === selectedId) ?? null;
@@ -155,12 +176,27 @@ export function TemplateEditorPage() {
                 onChange={(e) => setLayout((l) => ({ ...l, height: Number(e.target.value) }))}
                 sx={{ width: 120 }}
               />
+              {layout.background_image && (
+                <>
+                  <Chip
+                    icon={layout.background_image.locked ? <LockIcon /> : <LockOpenIcon />}
+                    label={`BG ${layout.background_image.locked ? 'locked' : 'unlocked'}`}
+                    onClick={toggleBackgroundLock}
+                    color={layout.background_image.locked ? 'default' : 'warning'}
+                    variant="outlined"
+                  />
+                  <Button size="small" color="error" onClick={removeBackground}>Remove BG</Button>
+                </>
+              )}
             </Stack>
             <CanvasEditor
               layout={layout}
               selectedId={selectedId}
               onSelect={setSelectedId}
               onUpdate={updateElement}
+              onBgUpdate={(patch) => setLayout((l) => l.background_image
+                ? { ...l, background_image: { ...l.background_image, ...patch } }
+                : l)}
             />
           </CardContent>
         </Card>
@@ -209,6 +245,15 @@ export function TemplateEditorPage() {
                   <TextField label="H" size="small" type="number" value={selectedEl.height}
                     onChange={(e) => updateElement(selectedEl.id, { height: Number(e.target.value) })} />
                 </Stack>
+                <FormControlLabel
+                  control={
+                    <Switch
+                      checked={!!selectedEl.locked}
+                      onChange={(e) => updateElement(selectedEl.id, { locked: e.target.checked })}
+                    />
+                  }
+                  label="Lock this element"
+                />
                 <Divider />
                 <Tooltip title="Remove element">
                   <IconButton color="error" onClick={() => removeElement(selectedEl.id)}>
@@ -219,6 +264,7 @@ export function TemplateEditorPage() {
             ) : (
               <Typography variant="body2" color="text.secondary">
                 Click an element on the canvas to edit its properties. Click a field in the left palette to add it.
+                {layout.background_image && ' The background image is locked by default — click the BG chip above to unlock and reposition.'}
               </Typography>
             )}
           </CardContent>
@@ -229,12 +275,13 @@ export function TemplateEditorPage() {
 }
 
 function CanvasEditor({
-  layout, selectedId, onSelect, onUpdate,
+  layout, selectedId, onSelect, onUpdate, onBgUpdate,
 }: {
   layout: TemplateLayout;
   selectedId: string | null;
   onSelect: (id: string | null) => void;
   onUpdate: (id: string, patch: Partial<TemplateElement>) => void;
+  onBgUpdate: (patch: { width?: number; height?: number; locked?: boolean }) => void;
 }) {
   const stageRef = useRef<Konva.Stage>(null);
   const trRef = useRef<Konva.Transformer>(null);
@@ -268,6 +315,16 @@ function CanvasEditor({
             cornerRadius={6}
             shadowColor="black" shadowBlur={6} shadowOpacity={0.08}
           />
+          {layout.background_image?.url && (
+            <BackgroundImageNode
+              url={layout.background_image.url}
+              locked={layout.background_image.locked ?? true}
+              x={20} y={20}
+              width={layout.width}
+              height={layout.height}
+              onResize={(w, h) => onBgUpdate({ width: w, height: h })}
+            />
+          )}
           {layout.elements.map((el) => (
             <ElementNode
               key={el.id} el={el}
@@ -283,6 +340,30 @@ function CanvasEditor({
   );
 }
 
+function BackgroundImageNode({
+  url, locked, x, y, width, height, onResize,
+}: { url: string; locked: boolean; x: number; y: number; width: number; height: number; onResize: (w: number, h: number) => void }) {
+  const [img] = useImage(url, 'anonymous');
+  if (!img) return null;
+  return (
+    <KImage
+      image={img}
+      x={x} y={y}
+      width={width}
+      height={height}
+      listening={!locked}
+      draggable={!locked}
+      onTransformEnd={(e) => {
+        const node = e.target as Konva.Image;
+        const sx = node.scaleX(); const sy = node.scaleY();
+        node.scaleX(1); node.scaleY(1);
+        onResize(Math.max(40, node.width() * sx), Math.max(40, node.height() * sy));
+      }}
+      opacity={locked ? 1 : 0.9}
+    />
+  );
+}
+
 function ElementNode({
   el, onSelect, onChange, offsetX, offsetY,
 }: {
@@ -295,7 +376,8 @@ function ElementNode({
     id: el.id,
     x: el.x + offsetX,
     y: el.y + offsetY,
-    draggable: true,
+    draggable: !el.locked,
+    listening: true,
     onClick: onSelect,
     onTap: onSelect,
     onDragEnd: (e: Konva.KonvaEventObject<DragEvent>) => onChange({ x: e.target.x() - offsetX, y: e.target.y() - offsetY }),
@@ -326,12 +408,13 @@ function ElementNode({
     );
   }
 
-  // For image / qr / barcode we render a placeholder rectangle with label.
   return (
     <>
       <Rect {...common}
         width={el.width} height={el.height}
-        stroke="#888" dash={[4, 3]} fill={PALETTE_KIND_COLOR[el.kind]}
+        stroke={el.locked ? '#aaa' : '#888'}
+        dash={el.locked ? undefined : [4, 3]}
+        fill={PALETTE_KIND_COLOR[el.kind]}
         cornerRadius={4}
       />
       <KText
