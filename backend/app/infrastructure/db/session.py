@@ -15,11 +15,22 @@ from app.core.config import settings
 
 
 def _connect_args() -> dict:
-    """Cloud Postgres providers (Neon, Supabase, Cockroach Cloud) all require
-    TLS. asyncpg doesn't pick up the libpq-style `sslmode` URL param, so we
-    detect a known cloud host and pass `ssl="require"` explicitly.
-    Local Postgres works with the default (no SSL negotiated)."""
+    """Provider-aware asyncpg tuning.
+
+    - TLS: cloud Postgres (Neon, Supabase, Cockroach Cloud, Aiven, Render)
+      requires SSL. asyncpg doesn't read libpq's `sslmode=` URL param, so
+      we pass `ssl="require"` explicitly when the host looks cloud-shaped.
+    - Statement cache: Supabase's *transaction pooler* (pgbouncer in
+      transaction mode, port 6543 or a `pooler.supabase.com` host) doesn't
+      hold a Postgres backend across statements, so asyncpg's server-side
+      prepared statement cache goes stale mid-query and blows up with
+      "prepared statement does not exist". Disable both caches when we
+      see that pooler; the *session pooler* keeps caches on because it
+      holds a backend for the whole session.
+    """
     url = settings.database_url.lower()
+    args: dict = {}
+
     cloud_markers = (
         "cockroachlabs.cloud",
         "neon.tech",
@@ -29,8 +40,19 @@ def _connect_args() -> dict:
         "aivencloud.com",
     )
     if any(m in url for m in cloud_markers):
-        return {"ssl": "require"}
-    return {}
+        args["ssl"] = "require"
+
+    # Supabase transaction pooler → pgbouncer transaction mode.
+    is_supabase_tx_pooler = (
+        "pooler.supabase.com" in url and ":6543" in url
+    ) or (
+        "supabase.co" in url and ":6543" in url
+    )
+    if is_supabase_tx_pooler:
+        args["statement_cache_size"] = 0
+        args["prepared_statement_cache_size"] = 0
+
+    return args
 
 
 engine = create_async_engine(
