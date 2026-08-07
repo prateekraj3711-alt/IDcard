@@ -27,9 +27,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: "20"
-          cache: npm
-          cache-dependency-path: dashboard/package-lock.json
+          node-version: "22"
       - name: Install
         working-directory: dashboard
         run: npm install --no-audit --no-fund
@@ -39,5 +37,5 @@ jobs:
       - name: Build
         working-directory: dashboard
         env:
-          VITE_API_BASE_URL: https://idcard-api.onrender.com/api/v1
+          VITE_API_BASE_URL: https://idcard-api-ppti.onrender.com/api/v1
         run: npm run build

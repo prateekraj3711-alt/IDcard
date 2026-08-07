@@ -35,7 +35,11 @@ class UploadPhotoWorker @AssistedInject constructor(
         var retryable = false
         for (photo in batch) {
             val student = studentDao.findByClientUuid(photo.studentClientUuid) ?: continue
-            val serverId = student.serverId ?: run { retryable = true; continue }
+            val serverId = student.serverId
+            if (serverId == null) {
+                retryable = true
+                continue
+            }
             try {
                 val signed = api.photoUploadUrl(
                     serverId,
