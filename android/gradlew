@@ -1,0 +1,24 @@
+#!/bin/sh
+#
+# Gradle start-up script for POSIX. Requires the wrapper JAR at
+# gradle/wrapper/gradle-wrapper.jar — Android Studio generates it on first
+# project import, or run `gradle wrapper` locally with any Gradle install.
+#
+set -eu
+
+APP_HOME=$(cd "$(dirname "$0")" && pwd)
+CLASSPATH="$APP_HOME/gradle/wrapper/gradle-wrapper.jar"
+
+if [ ! -f "$CLASSPATH" ]; then
+    cat <<EOF >&2
+gradle-wrapper.jar is missing. Two ways to fix it:
+
+  1. Open this project in Android Studio — it downloads the wrapper on import.
+  2. From a machine with Gradle installed:
+         cd android
+         gradle wrapper --gradle-version 8.9
+EOF
+    exit 1
+fi
+
+exec java -classpath "$CLASSPATH" org.gradle.wrapper.GradleWrapperMain "$@"

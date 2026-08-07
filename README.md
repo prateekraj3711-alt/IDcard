@@ -12,6 +12,7 @@ A production-grade platform for capturing student information from schools and g
 
 ## Documentation
 
+- **[Testing Guide (web + Android)](docs/TESTING_GUIDE.md)** ← start here to run it locally
 - [Architecture Overview](docs/ARCHITECTURE.md)
 - [Database Schema (ER)](docs/DATABASE_SCHEMA.md)
 - [API Specification](docs/API_SPECIFICATION.md)
