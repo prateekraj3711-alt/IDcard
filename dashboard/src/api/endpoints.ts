@@ -106,6 +106,17 @@ export const BulkImportsApi = {
       headers: { 'Content-Type': 'multipart/form-data' },
     }).then((r) => r.data);
   },
+  presignLocalPhotos: (importId: string, items: Array<{ enrollment_no: string; content_type?: string }>) =>
+    api.post<Array<{
+      enrollment_no: string;
+      put_url: string;
+      storage_key: string;
+      required_headers: Record<string, string>;
+    }>>(`/bulk-imports/${importId}/photos/presign`, items).then((r) => r.data),
+  recordLocalPhotos: (importId: string, items: Array<{ enrollment_no: string; storage_key: string }>) =>
+    api.post<{ photos_uploaded: number; photos_matched: number }>(
+      `/bulk-imports/${importId}/photos/record`, items,
+    ).then((r) => r.data),
   commit: (importId: string, body: {
     column_mapping?: Record<string, string>;
     default_class_id?: string;

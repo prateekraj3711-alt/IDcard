@@ -10,7 +10,7 @@ import PhotoLibraryIcon from '@mui/icons-material/PhotoLibrary';
 import AddIcon from '@mui/icons-material/Add';
 import ComputerIcon from '@mui/icons-material/Computer';
 import { SchoolsApi, BulkImportsApi } from '@/api/endpoints';
-import { isDesktop, pickFolder, listFolder } from '@/desktopBridge';
+import { isDesktop, pickFolder, listFolder, readBytes, type LocalFileEntry } from '@/desktopBridge';
 import type { BulkImportPreview, BulkImportCommitResult, School } from '@/types';
 
 const STUDENT_FIELDS = [
@@ -32,7 +32,15 @@ export function BulkImportPage() {
   const [newSchoolOpen, setNewSchoolOpen] = useState(false);
   const desktop = isDesktop();
   const [localFolder, setLocalFolder] = useState<string | null>(null);
-  const [localPhotoCount, setLocalPhotoCount] = useState<number | null>(null);
+  const [localFiles, setLocalFiles] = useState<LocalFileEntry[]>([]);
+  const [localUpload, setLocalUpload] = useState<{
+    busy: boolean;
+    done: number;
+    total: number;
+    msg: string;
+    matched: number | null;
+    error: string | null;
+  }>({ busy: false, done: 0, total: 0, msg: '', matched: null, error: null });
 
   const { data: schools } = useQuery({
     queryKey: ['schools', 'select'],
@@ -197,8 +205,8 @@ export function BulkImportPage() {
 
             {desktop && (
               <Alert severity="success" sx={{ mb: 2 }}>
-                Desktop mode detected — you can point at a local folder instead of zipping it up.
-                Photos stream directly to R2 from your machine.
+                Desktop mode — photos stream directly from your machine to R2 via
+                presigned URLs. Bytes never pass through the backend.
               </Alert>
             )}
 
@@ -211,7 +219,8 @@ export function BulkImportPage() {
                     if (!folder) return;
                     setLocalFolder(folder);
                     const files = await listFolder(folder, ['jpg', 'jpeg', 'png']);
-                    setLocalPhotoCount(files.length);
+                    setLocalFiles(files);
+                    setLocalUpload({ busy: false, done: 0, total: 0, msg: '', matched: null, error: null });
                   }}
                 >
                   {localFolder ? 'Change folder' : 'Pick photo folder'}
@@ -232,14 +241,102 @@ export function BulkImportPage() {
               <Button onClick={() => setStep(2)}>Back</Button>
             </Stack>
 
-            {localFolder && localPhotoCount !== null && (
-              <Alert severity="info" sx={{ mt: 2 }}>
-                Selected: <code>{localFolder}</code> — {localPhotoCount} image files found.
-                <br />
-                <em>Local streaming upload is coming in the next build; for now this preview only.
-                Continue to commit and use ZIP fallback for actual attachment.</em>
-              </Alert>
+            {localFolder && localFiles.length > 0 && (
+              <Box sx={{ mt: 2 }}>
+                <Alert severity="info" sx={{ mb: 2 }}>
+                  Selected: <code>{localFolder}</code> — {localFiles.length} image files found.
+                </Alert>
+                <Button
+                  variant="contained" color="primary"
+                  disabled={localUpload.busy}
+                  onClick={async () => {
+                    setLocalUpload({
+                      busy: true, done: 0, total: localFiles.length,
+                      msg: 'Requesting presigned URLs…', matched: null, error: null,
+                    });
+                    try {
+                      const enrollmentByStem = new Map<string, LocalFileEntry>();
+                      for (const f of localFiles) {
+                        enrollmentByStem.set(normalizeStem(f.stem), f);
+                      }
+                      const presignRequests = Array.from(enrollmentByStem.values()).map((f) => ({
+                        enrollment_no: f.stem,
+                        content_type: mimeForExt(f.extension),
+                      }));
+                      const urls = await BulkImportsApi.presignLocalPhotos(
+                        preview!.import_id, presignRequests,
+                      );
+
+                      const recorded: Array<{ enrollment_no: string; storage_key: string }> = [];
+                      for (let i = 0; i < urls.length; i++) {
+                        const u = urls[i];
+                        const file = enrollmentByStem.get(normalizeStem(u.enrollment_no));
+                        if (!file) continue;
+                        setLocalUpload((s) => ({
+                          ...s, done: i, msg: `Uploading ${file.name}…`,
+                        }));
+                        const bytes = await readBytes(file.path);
+                        const resp = await fetch(u.put_url, {
+                          method: 'PUT',
+                          headers: u.required_headers,
+                          body: bytes,
+                        });
+                        if (!resp.ok) throw new Error(`PUT ${file.name} failed (${resp.status})`);
+                        recorded.push({
+                          enrollment_no: u.enrollment_no,
+                          storage_key: u.storage_key,
+                        });
+                      }
+
+                      setLocalUpload((s) => ({
+                        ...s, done: urls.length, msg: 'Recording matches…',
+                      }));
+                      const rec = await BulkImportsApi.recordLocalPhotos(preview!.import_id, recorded);
+                      setLocalUpload({
+                        busy: false, done: urls.length, total: urls.length,
+                        msg: `Uploaded ${rec.photos_uploaded}, matched ${rec.photos_matched}.`,
+                        matched: rec.photos_matched, error: null,
+                      });
+                      setPhotoStats({
+                        photos_uploaded: rec.photos_uploaded,
+                        photos_matched: rec.photos_matched,
+                      });
+                    } catch (e) {
+                      setLocalUpload((s) => ({
+                        ...s, busy: false, error: (e as Error).message ?? 'Local upload failed',
+                      }));
+                    }
+                  }}
+                >
+                  {localUpload.busy ? `Uploading ${localUpload.done}/${localUpload.total}…` : 'Upload photos directly to storage'}
+                </Button>
+                {localUpload.busy && (
+                  <Box sx={{ mt: 2 }}>
+                    <Typography variant="body2">{localUpload.msg}</Typography>
+                    <LinearProgress
+                      variant={localUpload.total > 0 ? 'determinate' : 'indeterminate'}
+                      value={localUpload.total > 0
+                        ? Math.round((localUpload.done / localUpload.total) * 100)
+                        : 0}
+                    />
+                  </Box>
+                )}
+                {!localUpload.busy && localUpload.matched !== null && (
+                  <Alert severity="success" sx={{ mt: 2 }}>
+                    {localUpload.msg} Ready to commit.
+                  </Alert>
+                )}
+                {localUpload.error && (
+                  <Alert severity="error" sx={{ mt: 2 }}>{localUpload.error}</Alert>
+                )}
+                {!localUpload.busy && localUpload.matched !== null && (
+                  <Button sx={{ mt: 2 }} onClick={() => setStep(4)} variant="contained">
+                    Continue to commit
+                  </Button>
+                )}
+              </Box>
             )}
+
             {uploadPhotos.isPending && <LinearProgress sx={{ mt: 2 }} />}
           </CardContent>
         </Card>
@@ -295,6 +392,17 @@ export function BulkImportPage() {
       />
     </Box>
   );
+}
+
+function normalizeStem(s: string): string {
+  return s.toLowerCase().replace(/[^a-z0-9]+/g, '');
+}
+
+function mimeForExt(ext: string): string {
+  const e = ext.toLowerCase().replace(/^\./, '');
+  if (e === 'png') return 'image/png';
+  if (e === 'jpg' || e === 'jpeg') return 'image/jpeg';
+  return 'application/octet-stream';
 }
 
 function Metric({ label, value }: { label: string; value: ReactNode }) {
