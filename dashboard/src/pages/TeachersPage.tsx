@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   Box, Button, MenuItem, TextField, Typography, Dialog, DialogTitle, DialogContent,
@@ -8,6 +8,7 @@ import ContentCopyIcon from '@mui/icons-material/ContentCopy';
 import RefreshIcon from '@mui/icons-material/Refresh';
 import { DataGrid, GridColDef } from '@mui/x-data-grid';
 import { SchoolsApi, TeachersApi } from '@/api/endpoints';
+import type { School } from '@/types';
 
 interface Credentials { username: string; password: string }
 
@@ -80,7 +81,11 @@ export function TeachersPage() {
               <MenuItem key={s.id} value={s.id}>{s.code} — {s.name}</MenuItem>
             ))}
           </TextField>
-          <Button variant="contained" onClick={() => setOpen(true)} disabled={!schoolId}>
+          <Button
+            variant="contained"
+            onClick={() => setOpen(true)}
+            disabled={(schools?.items?.length ?? 0) === 0}
+          >
             Add teacher
           </Button>
         </Stack>
@@ -98,9 +103,11 @@ export function TeachersPage() {
       <AddTeacherDialog
         open={open}
         onClose={() => setOpen(false)}
-        onSubmit={(body) => createTeacher.mutate({ ...body, school_id: schoolId })}
+        onSubmit={(body) => createTeacher.mutate(body)}
         submitting={createTeacher.isPending}
         error={createTeacher.error as { response?: { data?: { detail?: string } } } | null}
+        schools={schools?.items ?? []}
+        defaultSchoolId={schoolId}
       />
 
       <CredentialsDialog open={!!issued} creds={issued} onClose={() => setIssued(null)} />
@@ -109,21 +116,41 @@ export function TeachersPage() {
 }
 
 function AddTeacherDialog({
-  open, onClose, onSubmit, submitting, error,
+  open, onClose, onSubmit, submitting, error, schools, defaultSchoolId,
 }: {
   open: boolean;
   onClose: () => void;
-  onSubmit: (body: { full_name: string; email: string; phone?: string; username?: string; password?: string }) => void;
+  onSubmit: (body: {
+    school_id: string;
+    full_name: string;
+    email: string;
+    phone?: string;
+    username?: string;
+    password?: string;
+  }) => void;
   submitting: boolean;
   error: { response?: { data?: { detail?: string } } } | null;
+  schools: School[];
+  defaultSchoolId: string;
 }) {
+  // If the page filter is "All schools" we still need one to attach the new
+  // teacher to — default to the first available and let the operator change.
+  const [school_id, setSchoolId] = useState(defaultSchoolId || schools[0]?.id || '');
   const [full_name, setFullName] = useState('');
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
 
+  // Re-seed the school field when the dialog re-opens or the filter changes.
+  useEffect(() => {
+    if (open) {
+      setSchoolId(defaultSchoolId || schools[0]?.id || '');
+    }
+  }, [open, defaultSchoolId, schools]);
+
   const submit = () => onSubmit({
+    school_id,
     full_name, email,
     phone: phone || undefined,
     username: username || undefined,
@@ -135,6 +162,16 @@ function AddTeacherDialog({
       <DialogTitle>Add teacher</DialogTitle>
       <DialogContent>
         <Stack spacing={2} sx={{ mt: 1 }}>
+          <TextField
+            select label="School" value={school_id}
+            onChange={(e) => setSchoolId(e.target.value)}
+            required
+            helperText="Teacher will be scoped to this school"
+          >
+            {schools.map((s) => (
+              <MenuItem key={s.id} value={s.id}>{s.code} — {s.name}</MenuItem>
+            ))}
+          </TextField>
           <TextField label="Full name" value={full_name} onChange={(e) => setFullName(e.target.value)} required />
           <TextField label="Email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
           <TextField label="Phone" value={phone} onChange={(e) => setPhone(e.target.value)} />
@@ -159,7 +196,10 @@ function AddTeacherDialog({
       </DialogContent>
       <DialogActions>
         <Button onClick={onClose}>Cancel</Button>
-        <Button variant="contained" onClick={submit} disabled={submitting || !full_name || !email}>
+        <Button
+          variant="contained" onClick={submit}
+          disabled={submitting || !school_id || !full_name || !email}
+        >
           {submitting ? 'Creating…' : 'Create'}
         </Button>
       </DialogActions>
