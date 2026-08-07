@@ -404,18 +404,52 @@ class TemplateImportResult(BaseModel):
 
 # --- Bulk import -----------------------------------------------------------
 
-# Sensible defaults matching the sample sheet in the spec image.
+# Header → student field. Not exhaustive — the service also does keyword-based
+# fuzzy matching against FIELD_KEYWORDS so headers like "S.N.", "ENR. NO.",
+# "FATHER NAME" or "CLASS" from various client sheets all auto-map.
 DEFAULT_COLUMN_MAPPING: dict[str, str] = {
-    "Ph No.": "photo_hint",         # a local path or filename hint — used to match photo folder entries
-    "Student Name": "name",
-    "Enr No.": "enrollment_no",
-    "Enr": "enrolled_year",
-    "DOB": "dob",
-    "Father's Name": "father_name",
-    "Mother's Name": "mother_name",
-    "Address": "address",
-    "Mobile": "mobile",
+    "Ph No.":         "photo_hint",
+    "S.N.":           "photo_hint",
+    "Student Name":   "name",
+    "NAME":           "name",
+    "Enr No.":        "enrollment_no",
+    "ENR. NO.":       "enrollment_no",
+    "Enr":            "enrolled_year",
+    "CLASS":          "class_name",
+    "SECTION":        "section_name",
+    "ROLL":           "roll_no",
+    "DOB":            "dob",
+    "Father's Name":  "father_name",
+    "FATHER NAME":    "father_name",
+    "Mother's Name":  "mother_name",
+    "MOTHER NAME":    "mother_name",
+    "Address":        "address",
+    "ADDRESS":        "address",
+    "Mobile":         "mobile",
+    "MOBILE":         "mobile",
 }
+
+# Token vocabulary used by the fuzzy suggester when a header isn't in
+# DEFAULT_COLUMN_MAPPING verbatim. Each entry is (field, keyword phrases the
+# normalized column may contain). Longer / more-specific phrases first so
+# "father name" beats "name".
+FIELD_KEYWORDS: list[tuple[str, list[str]]] = [
+    ("photo_hint",    ["photonumber", "photono", "phno", "photofile", "photograph", "sno", "srno", "serialno"]),
+    ("father_name",   ["fathername", "fathersname", "fathersname", "guardianname"]),
+    ("mother_name",   ["mothername", "mothersname"]),
+    ("enrollment_no", ["enrollmentno", "enrolmentno", "enrollmentid", "enrno", "enrolno", "registrationno", "regno", "admissionno"]),
+    ("roll_no",       ["rollno", "rollnumber", "roll"]),
+    ("class_name",    ["class", "standard", "std", "grade"]),
+    ("section_name",  ["section", "sec"]),
+    ("dob",           ["dateofbirth", "birthdate", "dob"]),
+    ("blood_group",   ["bloodgroup", "blood"]),
+    ("gender",        ["gender", "sex"]),
+    ("enrolled_on",   ["admissiondate", "joiningdate", "enrolledon", "dateofjoining"]),
+    ("enrolled_year", ["academicyear", "session", "batch", "year"]),
+    ("mobile",        ["mobilenumber", "mobileno", "phonenumber", "phoneno", "contactno", "contactnumber", "mobile", "phone", "contact"]),
+    ("address",       ["address", "residence", "location"]),
+    ("name",          ["studentname", "candidatename", "fullname", "name"]),
+]
 
 
 class BulkImportOut(ORMModel):

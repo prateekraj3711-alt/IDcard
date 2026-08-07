@@ -4,13 +4,13 @@ import csv
 import io
 import re
 import zipfile
-from datetime import datetime, timezone
+from datetime import date, datetime
 from pathlib import PurePosixPath
 from typing import Any
 from uuid import UUID, uuid4
 
 from openpyxl import load_workbook
-from sqlalchemy import select, update
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import CurrentUser, ensure_same_school
@@ -18,6 +18,7 @@ from app.core.config import settings
 from app.core.errors import Conflict, NotFound, Validation
 from app.domain.schemas import (
     DEFAULT_COLUMN_MAPPING,
+    FIELD_KEYWORDS,
     BulkImportCommitRequest,
     BulkImportCommitResult,
     BulkImportPreview,
@@ -28,7 +29,9 @@ from app.infrastructure.db.models import (
     BulkImportRow,
     BulkImportRowStatus,
     BulkImportStatus,
+    Class,
     Photo,
+    Section,
     Student,
     StudentStatus,
 )
@@ -152,13 +155,15 @@ class BulkImportService:
                 candidates = [
                     _normalize_stem(enrollment),
                     _normalize_stem(PurePosixPath(hint).stem) if hint else "",
+                    _normalize_stem(hint) if hint else "",
                 ]
                 found = next((stems[c] for c in candidates if c and c in stems), None)
                 if found is None:
                     continue
 
                 filename, body = found
-                key = f"{prefix}{_normalize_stem(enrollment or PurePosixPath(filename).stem)}.jpg"
+                stem_key = _normalize_stem(enrollment or PurePosixPath(filename).stem or hint)
+                key = f"{prefix}{stem_key}.jpg"
                 client.put_object(Bucket=settings.s3_bucket_photos, Key=key, Body=body, ContentType="image/jpeg")
                 row.photo_storage_key = key
                 matched += 1
@@ -186,6 +191,42 @@ class BulkImportService:
             )
         ).scalars().all()
 
+        # Cache classes/sections per school so repeated names in the sheet share a row.
+        class_cache: dict[str, UUID] = {}
+        section_cache: dict[tuple[UUID, str], UUID] = {}
+
+        async def _get_or_create_class(name: str) -> UUID:
+            key = name.strip().lower()
+            if key in class_cache:
+                return class_cache[key]
+            existing = (
+                await self.s.execute(
+                    select(Class).where(Class.school_id == imp.school_id, Class.name == name.strip())
+                )
+            ).scalar_one_or_none()
+            if existing is None:
+                existing = Class(school_id=imp.school_id, name=name.strip(), ordering=0)
+                self.s.add(existing)
+                await self.s.flush()
+            class_cache[key] = existing.id
+            return existing.id
+
+        async def _get_or_create_section(class_id: UUID, name: str) -> UUID:
+            key = (class_id, name.strip().lower())
+            if key in section_cache:
+                return section_cache[key]
+            existing = (
+                await self.s.execute(
+                    select(Section).where(Section.class_id == class_id, Section.name == name.strip())
+                )
+            ).scalar_one_or_none()
+            if existing is None:
+                existing = Section(class_id=class_id, name=name.strip(), ordering=0)
+                self.s.add(existing)
+                await self.s.flush()
+            section_cache[key] = existing.id
+            return existing.id
+
         imported, failed = 0, 0
         for row in rows:
             mapped, errors = self._map_row(row.raw, mapping)
@@ -197,12 +238,22 @@ class BulkImportService:
                 continue
 
             try:
+                class_id = req.default_class_id
+                section_id = req.default_section_id
+                cls_name = mapped.get("class_name")
+                sec_name = mapped.get("section_name")
+                if cls_name:
+                    class_id = await _get_or_create_class(str(cls_name))
+                if sec_name and class_id:
+                    section_id = await _get_or_create_section(class_id, str(sec_name))
+
                 student = Student(
                     client_uuid=uuid4(),
                     school_id=imp.school_id,
-                    class_id=req.default_class_id,
-                    section_id=req.default_section_id,
+                    class_id=class_id,
+                    section_id=section_id,
                     enrollment_no=mapped["enrollment_no"],
+                    roll_no=mapped.get("roll_no"),
                     name=mapped["name"],
                     father_name=mapped.get("father_name"),
                     mother_name=mapped.get("mother_name"),
@@ -223,7 +274,7 @@ class BulkImportService:
                             student_id=student.id,
                             storage_key=row.photo_storage_key,
                             content_type="image/jpeg",
-                            size_bytes=0,       # backfilled by post-commit head request in real impl
+                            size_bytes=0,
                             sha256="0" * 64,
                             is_primary=True,
                         )
@@ -258,17 +309,25 @@ class BulkImportService:
         return imp
 
     def _suggest_mapping(self, columns: list[str]) -> dict[str, str]:
+        """Auto-map columns to student fields using both a literal dictionary
+        and a token-based keyword matcher so headers like 'S.N.',
+        'ENR. NO.', 'FATHER NAME', 'CLASS', 'MOBILE' all resolve."""
         result: dict[str, str] = {}
         for col in columns:
-            key = col.strip()
-            if key in DEFAULT_COLUMN_MAPPING:
-                result[key] = DEFAULT_COLUMN_MAPPING[key]
+            header = col.strip()
+            if header in DEFAULT_COLUMN_MAPPING:
+                result[header] = DEFAULT_COLUMN_MAPPING[header]
                 continue
-            norm = re.sub(r"[^a-z0-9]+", "", key.lower())
-            for canonical, field in DEFAULT_COLUMN_MAPPING.items():
-                if re.sub(r"[^a-z0-9]+", "", canonical.lower()) == norm:
-                    result[key] = field
+            norm = _normalize_stem(header)
+            if not norm:
+                continue
+            matched: str | None = None
+            for field, phrases in FIELD_KEYWORDS:
+                if any(p in norm for p in phrases):
+                    matched = field
                     break
+            if matched:
+                result[header] = matched
         return result
 
     def _map_row(self, raw: dict, mapping: dict[str, str]) -> tuple[dict[str, Any], list[dict]]:
@@ -287,6 +346,16 @@ class BulkImportService:
         else:
             mapped["enrollment_no"] = str(mapped["enrollment_no"]).strip().upper()
 
+        # roll_no comes in as int/float/date sometimes; coerce to str
+        if "roll_no" in mapped and mapped["roll_no"] is not None:
+            mapped["roll_no"] = _stringify(mapped["roll_no"])
+
+        if "class_name" in mapped and mapped["class_name"] is not None:
+            mapped["class_name"] = _stringify(mapped["class_name"])
+
+        if "section_name" in mapped and mapped["section_name"] is not None:
+            mapped["section_name"] = _stringify(mapped["section_name"])
+
         if "dob" in mapped and mapped["dob"]:
             parsed = _parse_date(mapped["dob"])
             if parsed is None:
@@ -296,17 +365,22 @@ class BulkImportService:
 
         if "enrolled_year" in mapped and mapped["enrolled_year"]:
             try:
-                yr = int(str(mapped["enrolled_year"]).strip())
-                mapped["enrolled_on"] = datetime(yr, 1, 1, tzinfo=timezone.utc).date()
+                yr = int(re.sub(r"\D", "", str(mapped["enrolled_year"]))[:4] or "0")
+                if yr >= 1900:
+                    mapped["enrolled_on"] = date(yr, 1, 1)
             except Exception:
                 pass
 
         if "mobile" in mapped and mapped["mobile"]:
-            digits = re.sub(r"\D", "", str(mapped["mobile"]))
+            digits = re.sub(r"\D", "", _stringify(mapped["mobile"]))
             if len(digits) < 10:
                 errors.append({"field": "mobile", "code": "invalid"})
+            elif digits.startswith("91") and len(digits) == 12:
+                mapped["mobile"] = "+" + digits
+            elif len(digits) == 10:
+                mapped["mobile"] = "+91" + digits
             else:
-                mapped["mobile"] = "+" + digits if not digits.startswith("+") else digits
+                mapped["mobile"] = "+" + digits
 
         return mapped, errors
 
@@ -355,8 +429,16 @@ def _parse(content: bytes, source_type: str) -> list[dict]:
 
 
 def _cell(v: Any) -> Any:
+    """Preserve Excel dates in the human-readable Indian order (dd/mm/yyyy) so
+    values that were entered as text like '02/2026' but auto-converted by Excel
+    to dates round-trip cleanly. Non-date cells pass through untouched."""
     if isinstance(v, datetime):
-        return v.date().isoformat()
+        # If the value has no time component and is exactly midnight, treat as date.
+        if v.hour == 0 and v.minute == 0 and v.second == 0:
+            return v.strftime("%d/%m/%Y")
+        return v.strftime("%d/%m/%Y %H:%M")
+    if isinstance(v, date):
+        return v.strftime("%d/%m/%Y")
     return v
 
 
@@ -366,16 +448,28 @@ def _clean(v: Any) -> Any:
     return v
 
 
-_DATE_FORMATS = ("%Y-%m-%d", "%d-%m-%Y", "%d/%m/%Y", "%m/%d/%Y", "%d.%m.%Y")
+def _stringify(v: Any) -> str:
+    if isinstance(v, float) and v.is_integer():
+        return str(int(v))
+    return str(v).strip()
+
+
+_DATE_FORMATS = (
+    "%Y-%m-%d",
+    "%d/%m/%Y", "%d-%m-%Y", "%d.%m.%Y",
+    "%d/%m/%y", "%d-%m-%y",
+    "%m/%d/%Y",
+)
 
 
 def _parse_date(value: Any):
-    if hasattr(value, "isoformat"):
-        try:
-            return value.isoformat() if hasattr(value, "year") else str(value)
-        except Exception:
-            pass
-    s = str(value).strip()
+    if isinstance(value, date) and not isinstance(value, datetime):
+        return value
+    if isinstance(value, datetime):
+        return value.date()
+    s = _stringify(value).strip()
+    if not s:
+        return None
     for fmt in _DATE_FORMATS:
         try:
             return datetime.strptime(s, fmt).date()
