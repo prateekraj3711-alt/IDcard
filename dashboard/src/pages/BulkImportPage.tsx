@@ -276,10 +276,19 @@ export function BulkImportPage() {
                           ...s, done: i, msg: `Uploading ${file.name}…`,
                         }));
                         const bytes = await readBytes(file.path);
+                        // TS's DOM BlobPart requires ArrayBufferView<ArrayBuffer>, but a
+                        // Uint8Array's backing buffer is ArrayBufferLike (could be a
+                        // SharedArrayBuffer). Copy into a fresh ArrayBuffer to satisfy
+                        // the type checker; the copy is O(n) but only happens once per
+                        // photo, so it's fine.
+                        const ab = new ArrayBuffer(bytes.byteLength);
+                        new Uint8Array(ab).set(bytes);
                         const resp = await fetch(u.put_url, {
                           method: 'PUT',
                           headers: u.required_headers,
-                          body: new Blob([bytes], { type: u.required_headers['Content-Type'] ?? 'application/octet-stream' }),
+                          body: new Blob([ab], {
+                            type: u.required_headers['Content-Type'] ?? 'application/octet-stream',
+                          }),
                         });
                         if (!resp.ok) throw new Error(`PUT ${file.name} failed (${resp.status})`);
                         recorded.push({
