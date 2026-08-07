@@ -1,0 +1,90 @@
+# Render Blueprint — deploys the backend, Postgres and Redis together.
+#
+# One-time setup:
+#   1. Sign into Render with your GitHub.
+#   2. Dashboard → New → Blueprint → pick prateekraj3711-alt/IDcard →
+#      branch: claude/student-enrollment-id-cards-5nthet (or main after merge).
+#   3. Render reads this file, provisions everything, and prompts for the
+#      variables marked `sync: false` below (object storage credentials).
+#   4. Wait for the API to go green; note its public URL — that's what you
+#      paste into the dashboard and Android build.
+#
+# Cost: free tier for all three services (API sleeps after 15 min of idle
+# on the free plan — first request wakes it, ~30 s).
+
+services:
+  - type: web
+    name: idcard-api
+    runtime: docker
+    plan: free
+    region: oregon
+    dockerfilePath: ./backend/Dockerfile
+    dockerContext: ./backend
+    healthCheckPath: /healthz
+    autoDeploy: true
+    envVars:
+      - key: APP_ENV
+        value: prod
+      - key: LOG_LEVEL
+        value: INFO
+      - key: DATABASE_URL
+        fromDatabase:
+          name: idcard-postgres
+          property: connectionString
+      - key: REDIS_URL
+        fromService:
+          name: idcard-redis
+          type: redis
+          property: connectionString
+      - key: JWT_SECRET
+        generateValue: true                # Render generates a 64-char secret
+      - key: JWT_ALGORITHM
+        value: HS256
+      - key: ACCESS_TOKEN_TTL_SECONDS
+        value: 900
+      - key: REFRESH_TOKEN_TTL_SECONDS
+        value: 604800
+      - key: BCRYPT_ROUNDS
+        value: 12
+
+      # Object storage — Cloudflare R2 (recommended) or AWS S3. Fill in on
+      # first deploy. See docs/CLOUD_DEPLOY.md for R2 bucket setup steps.
+      - key: S3_ENDPOINT_URL
+        sync: false
+      - key: S3_REGION
+        value: auto                        # Cloudflare R2 uses "auto"
+      - key: S3_BUCKET_PHOTOS
+        sync: false
+      - key: S3_BUCKET_IDCARDS
+        sync: false
+      - key: S3_ACCESS_KEY
+        sync: false
+      - key: S3_SECRET_KEY
+        sync: false
+      - key: S3_USE_PATH_STYLE
+        value: "true"
+      - key: PRESIGN_TTL_SECONDS
+        value: 300
+      - key: MAX_PHOTO_BYTES
+        value: 5242880
+
+      # CORS — comma-separated list. Add your Vercel URL(s) here after the
+      # dashboard deploys. Example:
+      #   https://idcard.vercel.app,https://idcard-prateek.vercel.app
+      - key: CORS_ORIGINS
+        sync: false
+
+  - type: redis
+    name: idcard-redis
+    plan: free
+    region: oregon
+    maxmemoryPolicy: allkeys-lru
+    ipAllowList: []   # only reachable from Render services
+
+databases:
+  - name: idcard-postgres
+    plan: free
+    region: oregon
+    databaseName: idcard
+    postgresMajorVersion: 15
+    ipAllowList: []   # only reachable from Render services

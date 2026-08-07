@@ -1,0 +1,86 @@
+name: Android — build & publish APK
+
+on:
+  push:
+    branches: [main, "claude/**"]
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      api_base_url:
+        description: "Backend base URL (overrides the API_BASE_URL secret)"
+        required: false
+
+# Grant the default token permission to publish releases + upload artifacts.
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Check out
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+        with:
+          packages: "platforms;android-35 build-tools;35.0.0"
+
+      - name: Set up Gradle 8.9
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: "8.9"
+
+      - name: Bootstrap Gradle wrapper
+        working-directory: android
+        run: gradle wrapper --gradle-version 8.9
+
+      - name: Determine API base URL
+        id: api
+        run: |
+          URL="${{ github.event.inputs.api_base_url }}"
+          if [ -z "$URL" ]; then URL="${{ secrets.API_BASE_URL }}"; fi
+          if [ -z "$URL" ]; then URL="https://idcard-api.onrender.com/api/v1/"; fi
+          echo "url=$URL" >> "$GITHUB_OUTPUT"
+          echo "Backend URL baked into APK: $URL"
+
+      - name: Build debug APK
+        working-directory: android
+        env:
+          API_BASE_URL: ${{ steps.api.outputs.url }}
+        run: ./gradlew :app:assembleDebug -PapiBaseUrl="$API_BASE_URL"
+
+      - name: Rename APK
+        run: |
+          mkdir -p out
+          cp android/app/build/outputs/apk/debug/app-debug.apk \
+             "out/idcard-teacher-${{ github.sha }}.apk"
+
+      - name: Upload workflow artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: idcard-teacher-apk
+          path: out/*.apk
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Publish to GitHub Release (on tag push only)
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: out/*.apk
+          generate_release_notes: true
+          body: |
+            Teacher app build for tag ${{ github.ref_name }}.
+
+            Backend baked into APK: `${{ steps.api.outputs.url }}`
+
+            To install: download the `.apk`, transfer to phone, tap to install
+            (enable "Install unknown apps" for your browser/file manager).

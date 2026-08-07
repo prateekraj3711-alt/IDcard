@@ -7,6 +7,14 @@ plugins {
     id("com.google.devtools.ksp")
 }
 
+// Resolve the API base URL at build time.
+// Precedence: -PapiBaseUrl=... on the command line ▶ API_BASE_URL env var ▶ fallback.
+val configuredApiBaseUrl: String = (
+    (project.findProperty("apiBaseUrl") as String?)
+        ?: System.getenv("API_BASE_URL")
+        ?: "https://idcard-api.onrender.com/api/v1/"
+).let { if (it.endsWith("/")) it else "$it/" }
+
 android {
     namespace = "com.schoolapp.idcard"
     compileSdk = 35
@@ -19,7 +27,7 @@ android {
         versionName = "1.0.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
-        buildConfigField("String", "API_BASE_URL", "\"https://api.idcard.example.com/api/v1/\"")
+        buildConfigField("String", "API_BASE_URL", "\"$configuredApiBaseUrl\"")
     }
 
     buildTypes {
@@ -29,7 +37,12 @@ android {
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
         }
         debug {
-            buildConfigField("String", "API_BASE_URL", "\"http://10.0.2.2:8000/api/v1/\"")
+            // Debug builds also honor the resolved API URL — leave apiBaseUrl unset
+            // to fall back to the emulator loopback address instead.
+            val debugUrl = (project.findProperty("apiBaseUrl") as String?)
+                ?: System.getenv("API_BASE_URL")
+                ?: "http://10.0.2.2:8000/api/v1/"
+            buildConfigField("String", "API_BASE_URL", "\"${if (debugUrl.endsWith("/")) debugUrl else "$debugUrl/"}\"")
         }
     }
 
