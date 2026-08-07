@@ -16,7 +16,7 @@ class Settings(BaseSettings):
     database_pool_size: int = 10
     database_max_overflow: int = 20
 
-    redis_url: str = "redis://localhost:6379/0"
+    redis_url: str = ""     # optional — rate limiter falls open when unset
 
     jwt_secret: str
     jwt_algorithm: str = "HS256"

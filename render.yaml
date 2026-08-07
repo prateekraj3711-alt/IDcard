@@ -1,16 +1,22 @@
-# Render Blueprint — deploys the backend, Postgres and Redis together.
+# Render Blueprint — deploys the backend as a free web service.
+#
+# By default this file leaves DATABASE_URL and REDIS_URL as "sync: false"
+# (Render prompts you for them on first deploy). Two supported paths:
+#
+#   A) Card-free  — Neon Postgres + Upstash Redis (recommended, see
+#      docs/CLOUD_DEPLOY.md § "Card-free path")
+#   B) Card-required — uncomment the `databases:` and `- type: redis`
+#      blocks below to have Render provision managed Postgres + Redis
+#      alongside the web service (both need a payment method on file).
+#
+# Object storage is always via env vars. Card-free option is Supabase
+# Storage (also S3-compatible); the card-required option is Cloudflare R2.
 #
 # One-time setup:
 #   1. Sign into Render with your GitHub.
-#   2. Dashboard → New → Blueprint → pick prateekraj3711-alt/IDcard →
-#      branch: claude/student-enrollment-id-cards-5nthet (or main after merge).
-#   3. Render reads this file, provisions everything, and prompts for the
-#      variables marked `sync: false` below (object storage credentials).
-#   4. Wait for the API to go green; note its public URL — that's what you
-#      paste into the dashboard and Android build.
-#
-# Cost: free tier for all three services (API sleeps after 15 min of idle
-# on the free plan — first request wakes it, ~30 s).
+#   2. Dashboard → New → Blueprint → pick your fork → branch.
+#   3. Render reads this file and prompts for the sync:false variables.
+#   4. Wait for the API to go green; note its public URL.
 
 services:
   - type: web
@@ -27,15 +33,17 @@ services:
         value: prod
       - key: LOG_LEVEL
         value: INFO
+
+      # Paste your Neon (or Render/Supabase) Postgres URL here on first deploy.
+      # Format: postgresql+asyncpg://user:pass@host/db?sslmode=require
       - key: DATABASE_URL
-        fromDatabase:
-          name: idcard-postgres
-          property: connectionString
+        sync: false
+
+      # Optional — leave blank to disable the Redis-backed rate limiter
+      # (middleware fails open). Use rediss://... for Upstash TLS.
       - key: REDIS_URL
-        fromService:
-          name: idcard-redis
-          type: redis
-          property: connectionString
+        sync: false
+
       - key: JWT_SECRET
         generateValue: true                # Render generates a 64-char secret
       - key: JWT_ALGORITHM
@@ -47,12 +55,12 @@ services:
       - key: BCRYPT_ROUNDS
         value: 12
 
-      # Object storage — Cloudflare R2 (recommended) or AWS S3. Fill in on
-      # first deploy. See docs/CLOUD_DEPLOY.md for R2 bucket setup steps.
+      # Object storage — Supabase Storage (card-free) or Cloudflare R2. Both
+      # are S3-compatible. See CLOUD_DEPLOY.md for exact field values.
       - key: S3_ENDPOINT_URL
         sync: false
       - key: S3_REGION
-        value: auto                        # Cloudflare R2 uses "auto"
+        value: auto
       - key: S3_BUCKET_PHOTOS
         sync: false
       - key: S3_BUCKET_IDCARDS
@@ -69,22 +77,27 @@ services:
         value: 5242880
 
       # CORS — comma-separated list. Add your Vercel URL(s) here after the
-      # dashboard deploys. Example:
-      #   https://idcard.vercel.app,https://idcard-prateek.vercel.app
+      # dashboard deploys, e.g. https://idcard.vercel.app
       - key: CORS_ORIGINS
         sync: false
 
-  - type: redis
-    name: idcard-redis
-    plan: free
-    region: oregon
-    maxmemoryPolicy: allkeys-lru
-    ipAllowList: []   # only reachable from Render services
-
-databases:
-  - name: idcard-postgres
-    plan: free
-    region: oregon
-    databaseName: idcard
-    postgresMajorVersion: 15
-    ipAllowList: []   # only reachable from Render services
+# ---- Managed Postgres + Redis (requires a payment method on Render) --------
+# Uncomment to have Render provision these next to the API instead of using
+# Neon/Upstash. Remove or comment out the sync:false lines for DATABASE_URL
+# and REDIS_URL above, and re-wire them with fromDatabase / fromService.
+#
+# databases:
+#   - name: idcard-postgres
+#     plan: free
+#     region: oregon
+#     databaseName: idcard
+#     postgresMajorVersion: 15
+#     ipAllowList: []
+#
+# services:
+#   - type: redis
+#     name: idcard-redis
+#     plan: free
+#     region: oregon
+#     maxmemoryPolicy: allkeys-lru
+#     ipAllowList: []

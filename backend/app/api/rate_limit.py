@@ -28,7 +28,7 @@ class RateLimiter(BaseHTTPMiddleware):
         self._redis = None
 
     async def _get_redis(self):
-        if aioredis is None:
+        if aioredis is None or not self.redis_url:
             return None
         if self._redis is None:
             try:
