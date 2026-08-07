@@ -12,8 +12,17 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import coil.compose.AsyncImage
 import com.schoolapp.idcard.ui.components.BrandTopBar
+import java.io.File
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -26,6 +35,17 @@ fun StudentEditScreen(
     LaunchedEffect(studentClientUuid) { vm.load(studentClientUuid) }
     val state by vm.state.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
+
+    // When the camera screen pops back, re-read the photo path from Room so
+    // the thumbnail below reflects the just-captured image.
+    val lifecycleOwner = LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) vm.refreshPhoto()
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
 
     LaunchedEffect(state.savedOnce) {
         if (state.savedOnce) {
@@ -59,12 +79,41 @@ fun StudentEditScreen(
                 .verticalScroll(rememberScrollState())
                 .fillMaxSize(),
         ) {
-            // Photo card
+            // Photo card — shows a real thumbnail once captured
             OutlinedCard(modifier = Modifier.fillMaxWidth()) {
                 Column(
                     modifier = Modifier.padding(16.dp),
                     horizontalAlignment = Alignment.CenterHorizontally,
                 ) {
+                    Box(
+                        modifier = Modifier
+                            .size(width = 132.dp, height = 176.dp)
+                            .clip(RoundedCornerShape(12.dp)),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        if (state.hasPhoto && state.photoPath != null) {
+                            AsyncImage(
+                                model = File(state.photoPath!!),
+                                contentDescription = "Candidate photo",
+                                contentScale = ContentScale.Crop,
+                                modifier = Modifier.fillMaxSize(),
+                            )
+                        } else {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .background(MaterialTheme.colorScheme.surfaceVariant),
+                                contentAlignment = Alignment.Center,
+                            ) {
+                                Icon(
+                                    Icons.Filled.CameraAlt,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            }
+                        }
+                    }
+                    Spacer(Modifier.height(12.dp))
                     if (state.hasPhoto) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Icon(
@@ -72,10 +121,14 @@ fun StudentEditScreen(
                                 contentDescription = null,
                                 tint = MaterialTheme.colorScheme.primary,
                             )
-                            Spacer(Modifier.width(8.dp))
-                            Text("Photo captured", style = MaterialTheme.typography.bodyMedium)
+                            Spacer(Modifier.width(6.dp))
+                            Text(
+                                "Photo saved locally — will upload once online",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
                         }
-                        Spacer(Modifier.height(12.dp))
+                        Spacer(Modifier.height(8.dp))
                         OutlinedButton(onClick = onCapturePhoto, modifier = Modifier.fillMaxWidth()) {
                             Icon(Icons.Filled.CameraAlt, contentDescription = null)
                             Spacer(Modifier.width(8.dp))
@@ -83,11 +136,11 @@ fun StudentEditScreen(
                         }
                     } else {
                         Text(
-                            "No photo yet",
-                            style = MaterialTheme.typography.bodyMedium,
+                            "Photo required for the ID card",
+                            style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
-                        Spacer(Modifier.height(12.dp))
+                        Spacer(Modifier.height(8.dp))
                         Button(onClick = onCapturePhoto, modifier = Modifier.fillMaxWidth()) {
                             Icon(Icons.Filled.CameraAlt, contentDescription = null)
                             Spacer(Modifier.width(8.dp))

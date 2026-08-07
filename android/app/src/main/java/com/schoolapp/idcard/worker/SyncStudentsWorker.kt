@@ -2,7 +2,12 @@ package com.schoolapp.idcard.worker
 
 import android.content.Context
 import androidx.hilt.work.HiltWorker
+import androidx.work.Constraints
 import androidx.work.CoroutineWorker
+import androidx.work.ExistingWorkPolicy
+import androidx.work.NetworkType
+import androidx.work.OneTimeWorkRequestBuilder
+import androidx.work.WorkManager
 import androidx.work.WorkerParameters
 import com.schoolapp.idcard.data.local.dao.PendingOpDao
 import com.schoolapp.idcard.data.local.dao.StudentDao
@@ -51,6 +56,18 @@ class SyncStudentsWorker @AssistedInject constructor(
                 studentDao.updateSyncStatus(op.entityUuid, SyncStatus.FAILED, t.message)
             }
         }
+        // Once students have their serverId, kick off the photo uploader so it
+        // can drain PendingPhotoEntity rows against the fresh serverIds.
+        WorkManager.getInstance(applicationContext).enqueueUniqueWork(
+            "upload-photos",
+            ExistingWorkPolicy.APPEND_OR_REPLACE,
+            OneTimeWorkRequestBuilder<UploadPhotoWorker>()
+                .setConstraints(
+                    Constraints.Builder().setRequiredNetworkType(NetworkType.CONNECTED).build(),
+                )
+                .build(),
+        )
+
         return if (retryable) Result.retry() else Result.success()
     }
 

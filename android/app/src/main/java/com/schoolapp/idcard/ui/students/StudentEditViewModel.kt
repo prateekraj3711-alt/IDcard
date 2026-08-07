@@ -25,6 +25,7 @@ data class StudentEditUiState(
     val mobile: String? = null,
     val address: String? = null,
     val hasPhoto: Boolean = false,
+    val photoPath: String? = null,
     val error: String? = null,
     val saving: Boolean = false,
     val savedOnce: Boolean = false,
@@ -55,7 +56,25 @@ class StudentEditViewModel @Inject constructor(
                 mobile = row.mobile,
                 address = row.address,
                 hasPhoto = row.localPhotoPath != null,
+                photoPath = row.localPhotoPath,
             )
+        }
+    }
+
+    /**
+     * Called from [StudentEditScreen] whenever it becomes visible again — the
+     * camera flow may have just written a compressed photo to the row.
+     */
+    fun refreshPhoto() {
+        val uuid = _state.value.clientUuid
+        viewModelScope.launch {
+            val row = repo.getByUuid(uuid) ?: return@launch
+            _state.update {
+                it.copy(
+                    hasPhoto = row.localPhotoPath != null,
+                    photoPath = row.localPhotoPath,
+                )
+            }
         }
     }
 

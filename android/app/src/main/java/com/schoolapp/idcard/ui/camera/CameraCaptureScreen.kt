@@ -24,12 +24,17 @@ import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
+import androidx.hilt.navigation.compose.hiltViewModel
 import coil.compose.AsyncImage
 import java.io.File
 import java.util.concurrent.Executor
 
 @Composable
-fun CameraCaptureScreen(studentClientUuid: String, onDone: () -> Unit) {
+fun CameraCaptureScreen(
+    studentClientUuid: String,
+    onDone: () -> Unit,
+    vm: CameraViewModel = hiltViewModel(),
+) {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
     val executor = remember { ContextCompat.getMainExecutor(context) }
@@ -37,7 +42,11 @@ fun CameraCaptureScreen(studentClientUuid: String, onDone: () -> Unit) {
         ImageCapture.Builder().setTargetRotation(android.view.Surface.ROTATION_0).build()
     }
 
+    var capturedFile by remember { mutableStateOf<File?>(null) }
     var capturedUri by remember { mutableStateOf<Uri?>(null) }
+    val state by vm.state.collectAsState()
+
+    LaunchedEffect(state.done) { if (state.done) onDone() }
 
     Box(modifier = Modifier.fillMaxSize().background(Color.Black)) {
         if (capturedUri == null) {
@@ -61,8 +70,9 @@ fun CameraCaptureScreen(studentClientUuid: String, onDone: () -> Unit) {
                 Spacer(Modifier.height(12.dp))
                 Button(
                     onClick = {
-                        capture(context, executor, imageCapture, studentClientUuid) { uri ->
-                            capturedUri = uri
+                        capture(context, executor, imageCapture, studentClientUuid) { file ->
+                            capturedFile = file
+                            capturedUri = Uri.fromFile(file)
                         }
                     },
                 ) {
@@ -72,7 +82,6 @@ fun CameraCaptureScreen(studentClientUuid: String, onDone: () -> Unit) {
                 }
             }
         } else {
-            // Preview + confirm / retake
             AsyncImage(
                 model = capturedUri,
                 contentDescription = "Preview",
@@ -82,16 +91,40 @@ fun CameraCaptureScreen(studentClientUuid: String, onDone: () -> Unit) {
                 modifier = Modifier.align(Alignment.BottomCenter).padding(24.dp),
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
             ) {
-                OutlinedButton(onClick = { capturedUri = null }) {
+                OutlinedButton(
+                    onClick = {
+                        capturedFile = null
+                        capturedUri = null
+                    },
+                    enabled = !state.processing,
+                ) {
                     Icon(Icons.Filled.Refresh, contentDescription = null)
                     Spacer(Modifier.width(8.dp))
                     Text("Retake")
                 }
-                Button(onClick = onDone) {
-                    Icon(Icons.Filled.CheckCircle, contentDescription = null)
-                    Spacer(Modifier.width(8.dp))
-                    Text("Use photo")
+                Button(
+                    onClick = { capturedFile?.let { vm.finalizePhoto(studentClientUuid, it) } },
+                    enabled = !state.processing && capturedFile != null,
+                ) {
+                    if (state.processing) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(18.dp),
+                            strokeWidth = 2.dp,
+                            color = MaterialTheme.colorScheme.onPrimary,
+                        )
+                    } else {
+                        Icon(Icons.Filled.CheckCircle, contentDescription = null)
+                        Spacer(Modifier.width(8.dp))
+                        Text("Use photo")
+                    }
                 }
+            }
+            state.error?.let {
+                Text(
+                    it,
+                    color = MaterialTheme.colorScheme.error,
+                    modifier = Modifier.align(Alignment.TopCenter).padding(top = 24.dp),
+                )
             }
         }
     }
@@ -118,14 +151,14 @@ private fun capture(
     executor: Executor,
     capture: ImageCapture,
     clientUuid: String,
-    onCaptured: (Uri) -> Unit,
+    onCaptured: (File) -> Unit,
 ) {
     val outFile = File(ctx.cacheDir, "capture-$clientUuid.jpg")
     val opts = ImageCapture.OutputFileOptions.Builder(outFile).build()
     capture.takePicture(opts, executor, object : ImageCapture.OnImageSavedCallback {
         override fun onImageSaved(outputFileResults: ImageCapture.OutputFileResults) {
-            onCaptured(Uri.fromFile(outFile))
+            onCaptured(outFile)
         }
-        override fun onError(exception: ImageCaptureException) { /* no-op for scaffold */ }
+        override fun onError(exception: ImageCaptureException) { /* no-op — user can retake */ }
     })
 }
