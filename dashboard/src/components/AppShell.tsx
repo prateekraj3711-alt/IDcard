@@ -12,7 +12,7 @@ import { useAuth } from '@/auth/store';
 const nav = [
   { to: '/dashboard', label: 'Dashboard', icon: <DashboardIcon /> },
   { to: '/schools', label: 'Schools', icon: <SchoolIcon />, roles: ['super_admin'] as const },
-  { to: '/teachers', label: 'Teachers', icon: <PeopleIcon />, roles: ['super_admin', 'school_admin'] as const },
+  { to: '/teachers', label: 'Teachers', icon: <PeopleIcon />, roles: ['super_admin'] as const },
   { to: '/students', label: 'Students', icon: <BadgeIcon /> },
   { to: '/id-cards', label: 'ID Cards', icon: <CardMembershipIcon /> },
   { to: '/analytics', label: 'Analytics', icon: <AnalyticsIcon /> },

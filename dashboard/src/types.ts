@@ -28,6 +28,20 @@ export interface Teacher {
   last_login_at?: string | null;
 }
 
+export interface GeneratedCredentials {
+  username: string;
+  password: string;
+}
+
+export interface TeacherCreated extends Teacher {
+  credentials: GeneratedCredentials;
+}
+
+export interface PasswordResetResult {
+  user_id: string;
+  credentials: GeneratedCredentials;
+}
+
 export interface Student {
   id: string;
   client_uuid: string;
@@ -67,7 +81,7 @@ export interface LoginResponse {
     id: string;
     full_name: string;
     email: string;
-    role: 'super_admin' | 'school_admin' | 'teacher';
+    role: 'super_admin' | 'teacher';
     school?: { id: string; code: string; name: string } | null;
   };
 }

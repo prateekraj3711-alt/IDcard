@@ -1,6 +1,6 @@
 import { api } from './client';
 import type {
-  LoginResponse, Page, Student, School, Teacher, IdCardJob,
+  LoginResponse, Page, Student, School, Teacher, TeacherCreated, PasswordResetResult, IdCardJob,
 } from '@/types';
 
 export const AuthApi = {
@@ -20,8 +20,12 @@ export const SchoolsApi = {
 
 export const TeachersApi = {
   list: (schoolId: string) => api.get<Teacher[]>('/teachers', { params: { school_id: schoolId } }).then((r) => r.data),
-  create: (body: Partial<Teacher> & { password: string }) =>
-    api.post<Teacher>('/teachers', body).then((r) => r.data),
+  create: (body: {
+    school_id: string; full_name: string; email: string; phone?: string;
+    username?: string; password?: string;
+  }) => api.post<TeacherCreated>('/teachers', body).then((r) => r.data),
+  regeneratePassword: (id: string) =>
+    api.post<PasswordResetResult>(`/teachers/${id}/regenerate-password`).then((r) => r.data),
   delete: (id: string) => api.delete(`/teachers/${id}`),
 };
 

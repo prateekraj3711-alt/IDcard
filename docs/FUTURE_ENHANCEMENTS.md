@@ -4,7 +4,7 @@ Ranked by impact vs. effort.
 
 ## Near-term (1–2 sprints)
 
-1. **Bulk student import from Excel/CSV** — school admin uploads a spreadsheet; server validates rows, returns error report, imports valid rows.
+1. **Bulk student import from Excel/CSV** — super admin uploads a spreadsheet; server validates rows, returns error report, imports valid rows.
 2. **Push notifications** — FCM to teachers when their upload fails or requires action.
 3. **Attendance module** — extend the mobile app to mark attendance per class; QR-scan a student's ID.
 4. **Parent portal (mobile web)** — read-only view of the student profile via a signed URL sent over SMS.
@@ -29,7 +29,7 @@ Ranked by impact vs. effort.
 17. **Signed digital ID cards** — issue verifiable credentials (W3C VC) for cross-institution portability.
 18. **Regional data residency** — deploy stacks per region with data-locality policies.
 19. **Federated identity** — SSO via Google Workspace for Education, Microsoft 365.
-20. **AI-generated communications** — parental notices, event invitations composed by an LLM and reviewed by school admin.
+20. **AI-generated communications** — parental notices, event invitations composed by an LLM and reviewed by super admin before send.
 
 ## Reliability / Ops
 

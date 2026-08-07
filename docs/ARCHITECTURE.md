@@ -5,7 +5,7 @@
 ```
                                  ┌─────────────────────────────┐
                                  │   Admin Dashboard (React)    │
-                                 │  Super Admin / School Admin  │
+                                 │        Super Admin            │
                                  └──────────────┬──────────────┘
                                                 │ HTTPS/JSON (JWT)
         ┌──────────────────────┐                │
@@ -102,7 +102,7 @@ src/
 3. **Idempotent APIs** — every write accepts an `Idempotency-Key` header (checked against Redis for 24h).
 4. **Async heavy work** — ID card rendering, bulk PDF, and virus scanning go through a queue.
 5. **Signed upload URLs** — Android uploads photos directly to S3/R2 via presigned PUT, keeping app servers thin.
-6. **Row-level tenancy** — every query on students/photos filters by `school_id` from the JWT claim; enforced at the service layer with a decorator.
+6. **Row-level tenancy** — every query on students/photos filters by `school_id` from the JWT claim; enforced at the service layer with a decorator. Two roles only: `super_admin` (cross-school, all admin actions including provisioning teacher credentials) and `teacher` (single-school CRUD).
 7. **Audit everything mutating** — insert an audit-log row in the same transaction as the write.
 
 ## Key Design Decisions

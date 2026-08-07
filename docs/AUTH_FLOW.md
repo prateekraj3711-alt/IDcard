@@ -85,9 +85,27 @@ If refresh returns `401`, the app clears local tokens and routes to login.
 - After 5 consecutive failures within 15 minutes → `423 Locked` until 15 min pass.
 - Any successful login resets the counter.
 
+## Credential Provisioning (Super Admin → Teacher)
+
+There is no self-service teacher signup. The super admin creates the teacher account:
+
+1. Super admin submits `POST /teachers` with the teacher's name, email, and school. Username and password may be omitted.
+2. If omitted, the server generates:
+   - **Username** — normalized from the full name (`priya.sharma`, `priya.sharma1`, …) with a uniqueness suffix.
+   - **Password** — 12 chars from `secrets.choice()` over a reduced alphabet (no `I l O 0 1`).
+3. The plaintext password is returned **once** in the create response, and only in that response — bcrypt-hashed in `users.password_hash`. It is never retrievable again.
+4. The super admin passes the credentials to the teacher out-of-band (SMS, email, printed slip).
+5. Teacher logs in with `school_code + username + password`.
+
 ## Password Reset
 
-Out of scope for MVP teacher flow (admin resets from dashboard: `POST /teachers/{id}/reset-password` returns a one-time link emailed to the teacher).
+- Super admin calls `POST /teachers/{id}/regenerate-password`, which:
+  1. Generates a new plaintext password.
+  2. Updates `password_hash`.
+  3. Increments `users.token_version` — invalidating every existing access token.
+  4. Sets `failed_login_attempts = 0`.
+  5. Returns the new plaintext password **once**.
+- Teacher-initiated reset is out of scope for MVP.
 
 ## Session Revocation
 

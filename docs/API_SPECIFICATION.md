@@ -84,20 +84,55 @@ Super admin only.
 
 ## Teachers
 
-### GET `/teachers`  (super admin: all; school admin: own school)
+**All teacher endpoints require the `super_admin` role.**
+
+### GET `/teachers?school_id={uuid}`
+Lists teachers for a specific school.
+
 ### POST `/teachers`
+Creates a teacher. `username` and `password` are **optional** — when omitted the server generates them and returns them **once** in the response so the super admin can share them with the teacher.
+
+Request:
 ```json
 {
   "school_id": "1a…",
   "full_name": "Priya Sharma",
-  "username": "priya.sharma",
   "email": "priya@dps.edu",
-  "password": "TempP@ss123",
   "phone": "+91…"
 }
 ```
-### PATCH `/teachers/{id}`
-### POST `/teachers/{id}/reset-password`
+
+Response 201:
+```json
+{
+  "id": "3f0…",
+  "full_name": "Priya Sharma",
+  "email": "priya@dps.edu",
+  "role": "teacher",
+  "is_active": true,
+  "last_login_at": null,
+  "credentials": {
+    "username": "priya.sharma",
+    "password": "Kt3zPq7NnR6d"
+  }
+}
+```
+
+- `username` — generated from full name (`priya.sharma`, `priya.sharma1`, …). Passing a custom `username` in the request overrides.
+- `password` — 12 chars, mixed case + digits, ambiguous characters (`I l O 0 1`) excluded. Passing a custom `password` overrides.
+- The plaintext password is never returned again after this response.
+
+### POST `/teachers/{id}/regenerate-password`
+Rotates the teacher's password and revokes any existing sessions. Response returns the new plaintext password once.
+
+Response 200:
+```json
+{
+  "user_id": "3f0…",
+  "credentials": { "username": "priya.sharma", "password": "9Xt5RmYPnwFq" }
+}
+```
+
 ### DELETE `/teachers/{id}` (soft)
 
 ## Students

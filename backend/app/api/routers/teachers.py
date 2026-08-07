@@ -3,36 +3,47 @@ from uuid import UUID
 from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.deps import CurrentUser, ensure_same_school, require_role
-from app.domain.schemas import TeacherCreate, TeacherOut
+from app.api.deps import CurrentUser, require_role
+from app.domain.schemas import (
+    PasswordResetOut,
+    TeacherCreate,
+    TeacherCreatedOut,
+    TeacherOut,
+)
 from app.infrastructure.db.models import UserRole
 from app.infrastructure.db.session import get_session
 from app.services.teachers import TeacherService
 
 router = APIRouter(prefix="/teachers", tags=["teachers"])
 
+SUPER = require_role(UserRole.super_admin)
 
-@router.post("", response_model=TeacherOut, status_code=201)
+
+@router.post("", response_model=TeacherCreatedOut, status_code=201)
 async def create_teacher(
     body: TeacherCreate,
-    user: CurrentUser = Depends(require_role(UserRole.super_admin, UserRole.school_admin)),
+    _: CurrentUser = Depends(SUPER),
     session: AsyncSession = Depends(get_session),
 ):
-    ensure_same_school(user, body.school_id)
-    row = await TeacherService(session).create(body)
-    return TeacherOut(
-        id=row.id, full_name=row.full_name, email=row.email, role=row.role,
-        school=None, is_active=row.is_active, last_login_at=row.last_login_at,
+    row, creds = await TeacherService(session).create(body)
+    return TeacherCreatedOut(
+        id=row.id,
+        full_name=row.full_name,
+        email=row.email,
+        role=row.role,
+        school=None,
+        is_active=row.is_active,
+        last_login_at=row.last_login_at,
+        credentials=creds,
     )
 
 
 @router.get("", response_model=list[TeacherOut])
 async def list_teachers(
     school_id: UUID,
-    user: CurrentUser = Depends(require_role(UserRole.super_admin, UserRole.school_admin)),
+    _: CurrentUser = Depends(SUPER),
     session: AsyncSession = Depends(get_session),
 ):
-    ensure_same_school(user, school_id)
     rows = await TeacherService(session).list_by_school(school_id)
     return [
         TeacherOut(
@@ -43,10 +54,20 @@ async def list_teachers(
     ]
 
 
+@router.post("/{teacher_id}/regenerate-password", response_model=PasswordResetOut)
+async def regenerate_password(
+    teacher_id: UUID,
+    _: CurrentUser = Depends(SUPER),
+    session: AsyncSession = Depends(get_session),
+):
+    creds = await TeacherService(session).regenerate_password(teacher_id)
+    return PasswordResetOut(user_id=teacher_id, credentials=creds)
+
+
 @router.delete("/{teacher_id}", status_code=204)
 async def delete_teacher(
     teacher_id: UUID,
-    _: CurrentUser = Depends(require_role(UserRole.super_admin, UserRole.school_admin)),
+    _: CurrentUser = Depends(SUPER),
     session: AsyncSession = Depends(get_session),
 ):
     await TeacherService(session).soft_delete(teacher_id)

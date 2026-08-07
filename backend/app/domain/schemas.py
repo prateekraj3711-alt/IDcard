@@ -114,15 +114,32 @@ class SectionOut(ORMModel):
 class TeacherCreate(BaseModel):
     school_id: UUID
     full_name: str
-    username: str = Field(min_length=3, max_length=50, pattern=r"^[a-zA-Z0-9._-]+$")
     email: EmailStr
-    password: str = Field(min_length=8, max_length=128)
     phone: str | None = None
+    # Optional — when omitted the server generates and returns them once.
+    username: str | None = Field(default=None, min_length=3, max_length=50, pattern=r"^[a-zA-Z0-9._-]+$")
+    password: str | None = Field(default=None, min_length=8, max_length=128)
+
+
+class GeneratedCredentials(BaseModel):
+    username: str
+    password: str
 
 
 class TeacherOut(UserOut):
     is_active: bool
     last_login_at: datetime | None = None
+
+
+class TeacherCreatedOut(TeacherOut):
+    """Response for POST /teachers — includes the plaintext password once so
+    the super admin can hand it to the teacher. Never returned again."""
+    credentials: GeneratedCredentials
+
+
+class PasswordResetOut(BaseModel):
+    user_id: UUID
+    credentials: GeneratedCredentials
 
 
 class StudentBase(BaseModel):

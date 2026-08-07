@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 
-export type Role = 'super_admin' | 'school_admin' | 'teacher';
+export type Role = 'super_admin' | 'teacher';
 
 export interface CurrentUser {
   id: string;

@@ -26,7 +26,6 @@ from app.infrastructure.db.base import Base, SoftDelete, Timestamped, UUIDPK
 
 class UserRole(str, enum.Enum):
     super_admin = "super_admin"
-    school_admin = "school_admin"
     teacher = "teacher"
 
 

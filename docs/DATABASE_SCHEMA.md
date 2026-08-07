@@ -84,8 +84,8 @@ Indexes: `code`, `name` (GIN trigram).
 | username | citext UNIQUE | for teachers |
 | password_hash | text | bcrypt cost 12 |
 | full_name | varchar(150) | |
-| role | user_role ENUM | `super_admin`, `school_admin`, `teacher` |
-| school_id | uuid FK schools.id NULLABLE | required for non-super_admin |
+| role | user_role ENUM | `super_admin`, `teacher` |
+| school_id | uuid FK schools.id NULLABLE | required for teachers; null for super_admin |
 | is_active | boolean | |
 | last_login_at | timestamptz | |
 | failed_login_attempts | int | for lockout |
@@ -230,7 +230,7 @@ Index: `(user_id, revoked_at)`.
 ## Enums
 
 ```sql
-CREATE TYPE user_role      AS ENUM ('super_admin', 'school_admin', 'teacher');
+CREATE TYPE user_role      AS ENUM ('super_admin', 'teacher');
 CREATE TYPE student_status AS ENUM ('draft', 'submitted', 'active', 'archived');
 CREATE TYPE sync_op        AS ENUM ('create', 'update', 'delete', 'photo_upload');
 CREATE TYPE sync_status    AS ENUM ('pending', 'uploading', 'uploaded', 'failed');

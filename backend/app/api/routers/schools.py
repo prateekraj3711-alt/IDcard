@@ -39,7 +39,7 @@ async def create_school(
 @router.get("/{school_id}", response_model=SchoolOut)
 async def get_school(
     school_id: UUID,
-    user: CurrentUser = Depends(require_role(UserRole.super_admin, UserRole.school_admin)),
+    _: CurrentUser = Depends(require_role(UserRole.super_admin)),
     session: AsyncSession = Depends(get_session),
 ):
     return await SchoolService(session).get(school_id)

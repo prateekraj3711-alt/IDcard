@@ -55,6 +55,5 @@ Open `android/` in Android Studio (Iguana+), sync Gradle, run on device (API 24+
 
 ## Roles
 
-- **Super Admin** — full platform control, template management, cross-school analytics
-- **School Admin** — teacher management + own-school reporting
-- **Teacher** — student CRUD + photo capture on their assigned school only
+- **Super Admin** — full platform control: creates schools, creates teachers (with server-generated username + password returned once), can regenerate teacher passwords, manages templates, sees cross-school analytics.
+- **Teacher** — student CRUD + photo capture on their assigned school only. Signs in with school code + generated username + password.
