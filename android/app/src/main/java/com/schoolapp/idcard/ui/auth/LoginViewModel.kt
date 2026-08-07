@@ -33,8 +33,19 @@ class LoginViewModel @Inject constructor(
 
     fun submit(onSuccess: () -> Unit) {
         val s = _state.value
-        if (s.schoolCode.isBlank() || s.username.isBlank() || s.password.isBlank()) {
-            _state.update { it.copy(error = "Please fill all fields") }; return
+        if (s.username.isBlank() || s.password.isBlank()) {
+            _state.update { it.copy(error = "Enter your username/email/phone and password") }
+            return
+        }
+        // School code only mandatory when the identifier is a plain username.
+        // Email or phone lookups are global.
+        val id = s.username.trim()
+        val looksLikeEmail = "@" in id
+        val digits = id.replace(Regex("[^0-9+]"), "")
+        val looksLikePhone = !looksLikeEmail && (id.startsWith("+") || digits.length >= 7)
+        if (!looksLikeEmail && !looksLikePhone && s.schoolCode.isBlank()) {
+            _state.update { it.copy(error = "School code required for username sign-in") }
+            return
         }
         _state.update { it.copy(loading = true) }
         viewModelScope.launch {
@@ -42,8 +53,33 @@ class LoginViewModel @Inject constructor(
                 repo.login(s.schoolCode, s.username, s.password, deviceId = "android-${android.os.Build.MODEL}")
                 onSuccess()
             } catch (t: Throwable) {
-                _state.update { it.copy(loading = false, error = t.message ?: "Login failed") }
+                _state.update { it.copy(loading = false, error = friendlyError(t)) }
             }
+        }
+    }
+
+    private fun friendlyError(t: Throwable): String {
+        val http = t as? retrofit2.HttpException
+        val bodyDetail = http?.let {
+            try { it.response()?.errorBody()?.string() } catch (_: Throwable) { null }
+        }?.let { body ->
+            Regex("\"detail\"\\s*:\\s*\"([^\"]+)\"").find(body)?.groupValues?.get(1)
+                ?: Regex("\"msg\"\\s*:\\s*\"([^\"]+)\"").find(body)?.groupValues?.get(1)
+        }
+        val code = http?.code()
+        val raw = t.message.orEmpty()
+        return when {
+            code == 401 -> "Wrong username or password."
+            code == 404 -> "That user isn't registered yet."
+            code == 422 -> bodyDetail ?: "Please check the email/phone format."
+            code != null && code >= 500 -> "Server error — please try again shortly."
+            bodyDetail != null -> bodyDetail
+            raw.contains("Unable to resolve host", ignoreCase = true) ->
+                "Can't reach the server. Check your internet connection."
+            raw.contains("timeout", ignoreCase = true) ->
+                "Server took too long to respond. Please retry in a moment."
+            raw.isBlank() -> "Login failed. Please try again."
+            else -> raw
         }
     }
 }

@@ -77,15 +77,17 @@ class TeacherService:
         return user, GeneratedCredentials(username=username, password=password)
 
     async def list_by_school(self, school_id: UUID) -> list[User]:
-        rows = (
-            await self.s.execute(
-                select(User).where(
-                    User.role == UserRole.teacher,
-                    User.school_id == school_id,
-                    User.deleted_at.is_(None),
-                )
-            )
-        ).scalars().all()
+        return await self.list(school_id=school_id)
+
+    async def list(self, school_id: UUID | None = None) -> list[User]:
+        """Fetch teachers; optionally filter to one school."""
+        stmt = select(User).where(
+            User.role == UserRole.teacher,
+            User.deleted_at.is_(None),
+        )
+        if school_id is not None:
+            stmt = stmt.where(User.school_id == school_id)
+        rows = (await self.s.execute(stmt.order_by(User.created_at.desc()))).scalars().all()
         return list(rows)
 
     async def soft_delete(self, user_id: UUID) -> None:

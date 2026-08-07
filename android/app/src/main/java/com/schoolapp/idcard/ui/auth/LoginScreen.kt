@@ -92,8 +92,8 @@ fun LoginScreen(
                 OutlinedTextField(
                     value = state.schoolCode,
                     onValueChange = vm::onSchoolCode,
-                    label = { Text("School code") },
-                    supportingText = { Text("Provided by your admin") },
+                    label = { Text("School code (optional)") },
+                    supportingText = { Text("Only required if you sign in with a username") },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
                 )

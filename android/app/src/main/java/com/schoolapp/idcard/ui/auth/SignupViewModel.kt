@@ -57,9 +57,19 @@ class SignupViewModel @Inject constructor(
                 )
                 onSuccess()
             } catch (t: Throwable) {
-                _state.update { it.copy(loading = false, error = t.message ?: "Sign up failed") }
+                _state.update { it.copy(loading = false, error = extractApiError(t) ?: "Sign up failed") }
             }
         }
+    }
+
+    private fun extractApiError(t: Throwable): String? {
+        val http = t as? retrofit2.HttpException ?: return t.message
+        val body = try { http.response()?.errorBody()?.string() } catch (_: Throwable) { null }
+        if (body.isNullOrBlank()) return http.message()
+        // FastAPI returns {"detail": "..."} or {"detail": [{"msg": "..."}]}
+        return Regex("\"detail\"\\s*:\\s*\"([^\"]+)\"").find(body)?.groupValues?.get(1)
+            ?: Regex("\"msg\"\\s*:\\s*\"([^\"]+)\"").find(body)?.groupValues?.get(1)
+            ?: body.take(200)
     }
 
     private fun validate(s: SignupUiState): String? {

@@ -16,13 +16,27 @@ class AuthRepository @Inject constructor(
     val isLoggedIn: Boolean get() = tokens.access != null
 
     suspend fun login(schoolCode: String, identifier: String, password: String, deviceId: String): UserDto {
-        // Identifier can be username, email, or phone — the server auto-detects.
-        val looksLikeEmail = "@" in identifier
+        // Route the identifier to the right server field. Backend accepts:
+        //   • email               → global lookup, no school code needed
+        //   • phone               → global lookup, no school code needed
+        //   • username+school     → scoped lookup within one school
+        // A leading "+" or a string that's ≥ 7 digits with no letters is
+        // treated as a phone number so someone signing up with just a mobile
+        // can sign in the same way, without needing to remember their
+        // auto-generated username.
+        val id = identifier.trim()
+        val looksLikeEmail = "@" in id
+        val digitsOnly = id.replace(Regex("[^0-9+]"), "")
+        val looksLikePhone = !looksLikeEmail && (
+            id.startsWith("+") ||
+                (digitsOnly.length >= 7 && id.all { it.isDigit() || it == '+' || it == ' ' || it == '-' })
+        )
         val resp = api.login(
             LoginRequestDto(
-                school_code = schoolCode,
-                username = if (!looksLikeEmail) identifier else null,
-                email = if (looksLikeEmail) identifier else null,
+                school_code = schoolCode.ifBlank { null },
+                username = if (!looksLikeEmail && !looksLikePhone) id else null,
+                email = if (looksLikeEmail) id else null,
+                phone = if (looksLikePhone) id else null,
                 password = password,
                 device_id = deviceId,
             )

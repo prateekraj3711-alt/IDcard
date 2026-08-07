@@ -7,6 +7,7 @@ data class LoginRequestDto(
     val school_code: String? = null,
     val username: String? = null,
     val email: String? = null,
+    val phone: String? = null,
     val password: String,
     val device_id: String? = null,
 )

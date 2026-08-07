@@ -31,7 +31,10 @@ export const AdminsApi = {
 };
 
 export const TeachersApi = {
-  list: (schoolId: string) => api.get<Teacher[]>('/teachers', { params: { school_id: schoolId } }).then((r) => r.data),
+  list: (schoolId?: string) => {
+    const params = schoolId ? { school_id: schoolId } : {};
+    return api.get<Teacher[]>('/teachers', { params }).then((r) => r.data);
+  },
   create: (body: {
     school_id: string; full_name: string; email: string; phone?: string;
     username?: string; password?: string;

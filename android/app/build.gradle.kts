@@ -12,7 +12,7 @@ plugins {
 val configuredApiBaseUrl: String = (
     (project.findProperty("apiBaseUrl") as String?)
         ?: System.getenv("API_BASE_URL")
-        ?: "https://idcard-api.onrender.com/api/v1/"
+        ?: "https://idcard-api-ppti.onrender.com/api/v1/"
 ).let { if (it.endsWith("/")) it else "$it/" }
 
 android {

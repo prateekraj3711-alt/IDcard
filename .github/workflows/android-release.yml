@@ -47,7 +47,7 @@ jobs:
         run: |
           URL="${{ github.event.inputs.api_base_url }}"
           if [ -z "$URL" ]; then URL="${{ secrets.API_BASE_URL }}"; fi
-          if [ -z "$URL" ]; then URL="https://idcard-api.onrender.com/api/v1/"; fi
+          if [ -z "$URL" ]; then URL="https://idcard-api-ppti.onrender.com/api/v1/"; fi
           echo "url=$URL" >> "$GITHUB_OUTPUT"
           echo "Backend URL baked into APK: $URL"
 

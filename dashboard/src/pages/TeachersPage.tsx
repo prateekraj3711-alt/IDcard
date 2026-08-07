@@ -23,15 +23,14 @@ export function TeachersPage() {
   });
 
   const { data: teachers, isLoading } = useQuery({
-    queryKey: ['teachers', schoolId],
-    queryFn: () => TeachersApi.list(schoolId),
-    enabled: !!schoolId,
+    queryKey: ['teachers', schoolId || 'all'],
+    queryFn: () => TeachersApi.list(schoolId || undefined),
   });
 
   const createTeacher = useMutation({
     mutationFn: TeachersApi.create,
     onSuccess: (t) => {
-      qc.invalidateQueries({ queryKey: ['teachers', schoolId] });
+      qc.invalidateQueries({ queryKey: ['teachers'] });
       setOpen(false);
       setIssued(t.credentials);
     },
@@ -45,6 +44,12 @@ export function TeachersPage() {
   const columns: GridColDef[] = [
     { field: 'full_name', headerName: 'Name', flex: 1 },
     { field: 'email', headerName: 'Email', flex: 1 },
+    {
+      field: 'school',
+      headerName: 'School',
+      flex: 1,
+      valueGetter: (_v, row) => row.school?.code ? `${row.school.code} — ${row.school.name}` : '—',
+    },
     { field: 'is_active', headerName: 'Active', width: 100, type: 'boolean' },
     { field: 'last_login_at', headerName: 'Last login', width: 200 },
     {
@@ -68,7 +73,9 @@ export function TeachersPage() {
             select size="small" label="School" value={schoolId}
             onChange={(e) => setSchoolId(e.target.value)}
             sx={{ minWidth: 260, background: 'white' }}
+            helperText={!schoolId ? 'Showing all schools' : ''}
           >
+            <MenuItem value=""><em>All schools</em></MenuItem>
             {(schools?.items ?? []).map((s) => (
               <MenuItem key={s.id} value={s.id}>{s.code} — {s.name}</MenuItem>
             ))}
