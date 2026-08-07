@@ -56,7 +56,7 @@ class AuthService:
 
     async def signup_teacher(
         self, req: TeacherSignupRequest, ip: str | None, ua: str | None
-    ) -> tuple[User, TokenPair]:
+    ) -> tuple[User, TokenPair, School]:
         if not req.email and not req.phone:
             raise Validation("either email or phone is required")
 
@@ -105,7 +105,7 @@ class AuthService:
 
         pair = await self._issue_tokens(user, req.device_id, ip, ua)
         await self.s.commit()
-        return user, pair
+        return user, pair, school
 
     async def _suggest_username(self, full_name: str) -> str:
         import re as _re

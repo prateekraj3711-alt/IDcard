@@ -47,15 +47,18 @@ async def signup_teacher(
     session: AsyncSession = Depends(get_session),
 ):
     ip = request.client.host if request.client else None
-    user, pair = await AuthService(session).signup_teacher(req, ip, user_agent)
-    # Refresh to pull the school relation.
-    from app.infrastructure.db.models import User
-    row = await session.get(User, user.id)
-    school = SchoolMini(id=row.school.id, code=row.school.code, name=row.school.name) if row.school else None
+    user, pair, school = await AuthService(session).signup_teacher(req, ip, user_agent)
+    school_out = (
+        SchoolMini(id=school.id, code=school.code, name=school.name) if school else None
+    )
     return LoginResponse(
         **pair.model_dump(),
         user=UserOut(
-            id=row.id, full_name=row.full_name, email=row.email, role=row.role, school=school,
+            id=user.id,
+            full_name=user.full_name,
+            email=user.email,
+            role=user.role,
+            school=school_out,
         ),
     )
 
