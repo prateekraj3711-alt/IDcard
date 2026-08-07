@@ -3,7 +3,6 @@ package com.schoolapp.idcard
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.ui.Modifier
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -15,6 +14,7 @@ import com.schoolapp.idcard.ui.camera.CameraCaptureScreen
 import com.schoolapp.idcard.ui.students.StudentEditScreen
 import com.schoolapp.idcard.ui.students.StudentListScreen
 import com.schoolapp.idcard.ui.sync.SyncStatusScreen
+import com.schoolapp.idcard.ui.theme.StarkTheme
 import dagger.hilt.android.AndroidEntryPoint
 
 @AndroidEntryPoint
@@ -22,11 +22,15 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContent {
-            MaterialTheme {
+            StarkTheme {
                 Surface(modifier = Modifier) {
                     val nav = rememberNavController()
                     NavHost(navController = nav, startDestination = "login") {
-                        composable("login") { LoginScreen(onSuccess = { nav.navigate("students") { popUpTo("login") { inclusive = true } } }) }
+                        composable("login") {
+                            LoginScreen(onSuccess = {
+                                nav.navigate("students") { popUpTo("login") { inclusive = true } }
+                            })
+                        }
                         composable("students") {
                             StudentListScreen(
                                 onAdd = { nav.navigate("student/new") },
