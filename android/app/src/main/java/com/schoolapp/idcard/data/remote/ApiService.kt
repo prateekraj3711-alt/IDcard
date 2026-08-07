@@ -9,6 +9,7 @@ import com.schoolapp.idcard.data.remote.dto.RefreshRequestDto
 import com.schoolapp.idcard.data.remote.dto.StudentDto
 import com.schoolapp.idcard.data.remote.dto.SyncBatchRequestDto
 import com.schoolapp.idcard.data.remote.dto.SyncBatchResponseDto
+import com.schoolapp.idcard.data.remote.dto.TeacherSignupRequestDto
 import com.schoolapp.idcard.data.remote.dto.TokenPairDto
 import retrofit2.http.Body
 import retrofit2.http.Header
