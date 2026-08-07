@@ -17,14 +17,30 @@ def get_s3_client():
         config=Config(
             signature_version="s3v4",
             s3={"addressing_style": "path" if settings.s3_use_path_style else "auto"},
+            # Cloudflare R2 rejects requests that include an SSE header, and it
+            # doesn't understand streaming-signed payloads either. Force normal
+            # SigV4 with a payload sha256 instead of STREAMING-AWS4-HMAC-SHA256.
+            request_checksum_calculation="when_required",
+            response_checksum_validation="when_required",
         ),
     )
 
 
+def _is_r2() -> bool:
+    return bool(settings.s3_endpoint_url and "r2.cloudflarestorage.com" in settings.s3_endpoint_url)
+
+
 def presign_put(bucket: str, key: str, content_type: str = "image/jpeg", sha256_b64: str | None = None) -> dict:
-    params = {"Bucket": bucket, "Key": key, "ContentType": content_type, "ServerSideEncryption": "AES256"}
-    if sha256_b64:
+    """Presigned PUT URL for direct-from-client uploads. Adjusts params for
+    Cloudflare R2 (no SSE, no checksum-in-signature)."""
+    params: dict = {"Bucket": bucket, "Key": key, "ContentType": content_type}
+    required_headers = {"Content-Type": content_type}
+    if not _is_r2():
+        params["ServerSideEncryption"] = "AES256"
+        required_headers["x-amz-server-side-encryption"] = "AES256"
+    if sha256_b64 and not _is_r2():
         params["ChecksumSHA256"] = sha256_b64
+
     url = get_s3_client().generate_presigned_url(
         "put_object", Params=params, ExpiresIn=settings.presign_ttl_seconds
     )
@@ -32,7 +48,7 @@ def presign_put(bucket: str, key: str, content_type: str = "image/jpeg", sha256_
         "url": url,
         "storage_key": key,
         "expires_in": settings.presign_ttl_seconds,
-        "required_headers": {"Content-Type": content_type, "x-amz-server-side-encryption": "AES256"},
+        "required_headers": required_headers,
     }
 
 
