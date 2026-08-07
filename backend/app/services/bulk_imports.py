@@ -257,11 +257,11 @@ class BulkImportService:
                     name=mapped["name"],
                     father_name=mapped.get("father_name"),
                     mother_name=mapped.get("mother_name"),
-                    dob=mapped.get("dob"),
+                    dob=_iso_to_date(mapped.get("dob")),
                     blood_group=mapped.get("blood_group"),
                     address=mapped.get("address"),
                     mobile=mapped.get("mobile"),
-                    enrolled_on=mapped.get("enrolled_on"),
+                    enrolled_on=_iso_to_date(mapped.get("enrolled_on")),
                     status=StudentStatus.active,
                     created_by=user.id,
                 )
@@ -283,8 +283,18 @@ class BulkImportService:
                 row.student_id = student.id
                 imported += 1
             except Exception as exc:
-                row.status = BulkImportRowStatus.failed
-                row.errors = [{"code": "db_error", "message": str(exc)}]
+                # Recover the session so subsequent rows can still be tried.
+                await self.s.rollback()
+                # Re-mark the failing row on a fresh transaction.
+                await self.s.execute(
+                    BulkImportRow.__table__.update()
+                    .where(BulkImportRow.id == row.id)
+                    .values(
+                        status=BulkImportRowStatus.failed,
+                        errors=[{"code": "db_error", "message": str(exc)}],
+                    )
+                )
+                await self.s.commit()
                 failed += 1
 
         imp.status = BulkImportStatus.completed if failed == 0 else BulkImportStatus.failed
@@ -356,18 +366,21 @@ class BulkImportService:
         if "section_name" in mapped and mapped["section_name"] is not None:
             mapped["section_name"] = _stringify(mapped["section_name"])
 
+        # Dates go into a JSONB column via `row.mapped`, so keep them as ISO
+        # strings here — SQLAlchemy can't serialize datetime.date to JSON.
+        # They're parsed back to `date` at Student-create time.
         if "dob" in mapped and mapped["dob"]:
             parsed = _parse_date(mapped["dob"])
             if parsed is None:
                 errors.append({"field": "dob", "code": "invalid_date"})
             else:
-                mapped["dob"] = parsed
+                mapped["dob"] = parsed.isoformat()
 
         if "enrolled_year" in mapped and mapped["enrolled_year"]:
             try:
                 yr = int(re.sub(r"\D", "", str(mapped["enrolled_year"]))[:4] or "0")
                 if yr >= 1900:
-                    mapped["enrolled_on"] = date(yr, 1, 1)
+                    mapped["enrolled_on"] = date(yr, 1, 1).isoformat()
             except Exception:
                 pass
 
@@ -476,6 +489,21 @@ def _parse_date(value: Any):
         except ValueError:
             continue
     return None
+
+
+def _iso_to_date(value: Any):
+    """Coerce an ISO-YYYY-MM-DD string back to a `date` for Student columns.
+    Returns None if the value is falsy or unparseable."""
+    if value is None or value == "":
+        return None
+    if isinstance(value, date) and not isinstance(value, datetime):
+        return value
+    if isinstance(value, datetime):
+        return value.date()
+    try:
+        return date.fromisoformat(str(value))
+    except Exception:
+        return None
 
 
 def _is_image(name: str) -> bool:
