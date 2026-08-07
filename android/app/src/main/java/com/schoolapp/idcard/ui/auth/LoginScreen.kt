@@ -26,7 +26,9 @@ fun LoginScreen(onSuccess: () -> Unit, vm: LoginViewModel = hiltViewModel()) {
         Spacer(Modifier.height(12.dp))
         OutlinedTextField(
             value = state.username, onValueChange = vm::onUsername,
-            label = { Text("Username") }, modifier = Modifier.fillMaxWidth(),
+            label = { Text("Username, email, or phone") },
+            supportingText = { Text("Any identifier your admin set up") },
+            modifier = Modifier.fillMaxWidth(),
         )
         Spacer(Modifier.height(12.dp))
         OutlinedTextField(

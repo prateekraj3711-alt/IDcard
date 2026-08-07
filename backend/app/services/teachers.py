@@ -6,6 +6,7 @@ import string
 from datetime import datetime, timezone
 from uuid import UUID
 
+import phonenumbers
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -15,16 +16,41 @@ from app.domain.schemas import GeneratedCredentials, TeacherCreate
 from app.infrastructure.db.models import User, UserRole
 
 
+def _normalize_phone(raw: str | None, default_region: str = "IN") -> str | None:
+    if not raw:
+        return None
+    try:
+        parsed = phonenumbers.parse(raw, default_region)
+        if not phonenumbers.is_valid_number(parsed):
+            return None
+        return phonenumbers.format_number(parsed, phonenumbers.PhoneNumberFormat.E164)
+    except Exception:
+        return None
+
+
 class TeacherService:
     def __init__(self, session: AsyncSession):
         self.s = session
 
     async def create(self, data: TeacherCreate) -> tuple[User, GeneratedCredentials]:
+        # Normalize phone up front so lookups from the login flow compare
+        # against a canonical E.164 value.
+        phone = _normalize_phone(data.phone) if data.phone else None
+        if data.phone and phone is None:
+            raise Conflict("phone number is not valid")
+
         existing_email = (
             await self.s.execute(select(User).where(User.email == data.email))
         ).scalar_one_or_none()
         if existing_email:
             raise Conflict("email already in use")
+
+        if phone:
+            existing_phone = (
+                await self.s.execute(select(User).where(User.phone == phone))
+            ).scalar_one_or_none()
+            if existing_phone:
+                raise Conflict("phone already in use")
 
         username = data.username or await self._suggest_username(data.full_name)
         if data.username:
@@ -43,7 +69,7 @@ class TeacherService:
             full_name=data.full_name,
             role=UserRole.teacher,
             school_id=data.school_id,
-            phone=data.phone,
+            phone=phone,
         )
         self.s.add(user)
         await self.s.commit()

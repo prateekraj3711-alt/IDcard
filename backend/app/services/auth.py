@@ -78,11 +78,39 @@ class AuthService:
             ).scalar_one_or_none()
             if school is None:
                 return None
-            return (
+
+            identifier = req.username.strip()
+
+            # 1. Exact username match within the school
+            found = (
                 await self.s.execute(
-                    select(User).where(User.username == req.username, User.school_id == school.id)
+                    select(User).where(User.username == identifier, User.school_id == school.id)
                 )
             ).scalar_one_or_none()
+            if found is not None:
+                return found
+
+            # 2. Email match within the school (case-insensitive via CITEXT)
+            if "@" in identifier:
+                found = (
+                    await self.s.execute(
+                        select(User).where(User.email == identifier, User.school_id == school.id)
+                    )
+                ).scalar_one_or_none()
+                if found is not None:
+                    return found
+
+            # 3. Phone match within the school, trying common candidate formats
+            for candidate in _phone_candidates(identifier):
+                found = (
+                    await self.s.execute(
+                        select(User).where(User.phone == candidate, User.school_id == school.id)
+                    )
+                ).scalar_one_or_none()
+                if found is not None:
+                    return found
+
+            return None
         return None
 
     async def _issue_tokens(
