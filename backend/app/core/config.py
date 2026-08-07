@@ -43,6 +43,30 @@ class Settings(BaseSettings):
             return [o.strip() for o in v.split(",") if o.strip()]
         return v
 
+    @field_validator("database_url", mode="before")
+    @classmethod
+    def _normalize_database_url(cls, v):
+        """Make the URL safe for SQLAlchemy async no matter which form the user
+        pasted. Neon and Render both emit `postgres://…` (or `postgresql://…`)
+        with a `?sslmode=require` query — neither works with the async driver
+        we install (asyncpg). Rewrite here so it always works."""
+        if not isinstance(v, str) or not v:
+            return v
+        # Prefix
+        if v.startswith("postgres://"):
+            v = "postgresql+asyncpg://" + v[len("postgres://"):]
+        elif v.startswith("postgresql://") and "+" not in v.split("://", 1)[0]:
+            v = "postgresql+asyncpg://" + v[len("postgresql://"):]
+        # Strip sslmode — asyncpg negotiates TLS on its own
+        if "?" in v:
+            base, _, query = v.partition("?")
+            parts = [
+                kv for kv in query.split("&")
+                if kv and not kv.lower().startswith("sslmode=")
+            ]
+            v = base + (("?" + "&".join(parts)) if parts else "")
+        return v
+
 
 @lru_cache
 def get_settings() -> Settings:
