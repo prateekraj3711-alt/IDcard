@@ -5,6 +5,7 @@ import {
 import DashboardIcon from '@mui/icons-material/SpaceDashboard';
 import SchoolIcon from '@mui/icons-material/School';
 import PeopleIcon from '@mui/icons-material/People';
+import AdminPanelSettingsIcon from '@mui/icons-material/AdminPanelSettings';
 import BadgeIcon from '@mui/icons-material/Badge';
 import AnalyticsIcon from '@mui/icons-material/Analytics';
 import CardMembershipIcon from '@mui/icons-material/CardMembership';
@@ -33,6 +34,12 @@ const nav = [
       { to: '/teachers', label: 'Teachers', icon: <PeopleIcon />, roles: ['super_admin'] as const },
       { to: '/students', label: 'Candidates', icon: <BadgeIcon /> },
       { to: '/bulk-import', label: 'Bulk Import', icon: <UploadFileIcon />, roles: ['super_admin'] as const },
+    ],
+  },
+  {
+    section: 'Access',
+    items: [
+      { to: '/admins', label: 'Super Admins', icon: <AdminPanelSettingsIcon />, roles: ['super_admin'] as const },
     ],
   },
   {

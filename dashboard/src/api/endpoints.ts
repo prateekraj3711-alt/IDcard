@@ -1,6 +1,7 @@
 import { api } from './client';
 import type {
   LoginResponse, Page, Student, School, Teacher, TeacherCreated, PasswordResetResult,
+  Admin, AdminCreated,
   IdCardJob, Template, TemplateModule, FieldCatalogEntry,
   BulkImportPreview, BulkImportCommitResult, BulkImportRow,
 } from '@/types';
@@ -18,6 +19,15 @@ export const SchoolsApi = {
   create: (body: Partial<School>) => api.post<School>('/schools', body).then((r) => r.data),
   update: (id: string, body: Partial<School>) => api.patch<School>(`/schools/${id}`, body).then((r) => r.data),
   delete: (id: string) => api.delete(`/schools/${id}`),
+};
+
+export const AdminsApi = {
+  list: () => api.get<Admin[]>('/admins').then((r) => r.data),
+  create: (body: { full_name: string; email: string; phone?: string; username?: string; password?: string }) =>
+    api.post<AdminCreated>('/admins', body).then((r) => r.data),
+  regeneratePassword: (id: string) =>
+    api.post<PasswordResetResult>(`/admins/${id}/regenerate-password`).then((r) => r.data),
+  delete: (id: string) => api.delete(`/admins/${id}`),
 };
 
 export const TeachersApi = {

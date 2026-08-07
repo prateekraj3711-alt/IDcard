@@ -6,6 +6,7 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 from app.api.middleware import RequestIdMiddleware, SecurityHeadersMiddleware
 from app.api.rate_limit import RateLimiter
 from app.api.routers import (
+    admins,
     auth,
     bulk_imports,
     health,
@@ -70,6 +71,7 @@ async def unhandled_handler(request: Request, exc: Exception):
 API_V1 = "/api/v1"
 for r in (
     auth.router,
+    admins.router,
     schools.router,
     teachers.router,
     students.router,

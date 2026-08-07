@@ -9,6 +9,7 @@ import { StudentsPage } from '@/pages/StudentsPage';
 import { StudentProfilePage } from '@/pages/StudentProfilePage';
 import { IdCardsPage } from '@/pages/IdCardsPage';
 import { AnalyticsPage } from '@/pages/AnalyticsPage';
+import { AdminsPage } from '@/pages/AdminsPage';
 import { BulkImportPage } from '@/pages/BulkImportPage';
 import { TemplatesPage } from '@/pages/TemplatesPage';
 import { TemplateEditorPage } from '@/pages/TemplateEditorPage';
@@ -22,6 +23,7 @@ export function App() {
         <Route path="/" element={<Navigate to="/dashboard" replace />} />
         <Route path="/dashboard" element={<DashboardPage />} />
         <Route path="/schools" element={<SchoolsPage />} />
+        <Route path="/admins" element={<AdminsPage />} />
         <Route path="/teachers" element={<TeachersPage />} />
         <Route path="/students" element={<StudentsPage />} />
         <Route path="/students/:id" element={<StudentProfilePage />} />

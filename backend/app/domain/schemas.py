@@ -152,6 +152,28 @@ class PasswordResetOut(BaseModel):
     credentials: GeneratedCredentials
 
 
+class AdminCreate(BaseModel):
+    full_name: str
+    email: EmailStr
+    phone: str | None = None
+    username: str | None = Field(default=None, min_length=3, max_length=50, pattern=r"^[a-zA-Z0-9._-]+$")
+    password: str | None = Field(default=None, min_length=8, max_length=128)
+
+
+class AdminOut(ORMModel):
+    id: UUID
+    full_name: str
+    email: EmailStr
+    role: UserRole
+    is_active: bool
+    last_login_at: datetime | None = None
+    created_at: datetime
+
+
+class AdminCreatedOut(AdminOut):
+    credentials: GeneratedCredentials
+
+
 class StudentBase(BaseModel):
     school_id: UUID
     class_id: UUID | None = None
