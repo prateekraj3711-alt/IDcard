@@ -24,6 +24,7 @@ import okhttp3.logging.HttpLoggingInterceptor
 import retrofit2.Retrofit
 import retrofit2.converter.kotlinx.serialization.asConverterFactory
 import java.util.concurrent.TimeUnit
+import javax.inject.Named
 import javax.inject.Singleton
 
 @Module
@@ -39,14 +40,22 @@ object AppModule {
         explicitNulls = false
     }
 
-    @Provides @Singleton
+    /**
+     * Standalone OkHttpClient used ONLY by the RefreshApi. Kept separate from
+     * the main authenticated client so we don't create a DI cycle:
+     *   provideOkHttp → TokenAuthenticator → RefreshApi → provideRefreshClient
+     */
+    @Provides @Singleton @Named("refresh")
     fun provideRefreshClient(): OkHttpClient = OkHttpClient.Builder()
         .connectTimeout(15, TimeUnit.SECONDS)
         .readTimeout(15, TimeUnit.SECONDS)
         .build()
 
     @Provides @Singleton
-    fun provideRefreshApi(client: OkHttpClient, json: Json): RefreshApi =
+    fun provideRefreshApi(
+        @Named("refresh") client: OkHttpClient,
+        json: Json,
+    ): RefreshApi =
         Retrofit.Builder()
             .baseUrl(BuildConfig.API_BASE_URL)
             .client(client)
@@ -54,6 +63,7 @@ object AppModule {
             .build()
             .create(RefreshApi::class.java)
 
+    /** Main authenticated OkHttp used by everything except RefreshApi. */
     @Provides @Singleton
     fun provideOkHttp(
         authInterceptor: AuthInterceptor,

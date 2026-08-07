@@ -180,9 +180,18 @@ export function TemplateEditorPage() {
                 onChange={(e) => setLayout((l) => ({ ...l, height: Number(e.target.value) }))}
                 sx={{ width: 120 }}
               />
+              <TextField
+                select label="DPI" size="small" value={layout.dpi ?? 300}
+                onChange={(e) => setLayout((l) => ({ ...l, dpi: Number(e.target.value) }))}
+                sx={{ width: 100 }}
+              >
+                {[72, 96, 150, 200, 300, 400, 500, 600].map((d) => (
+                  <MenuItem key={d} value={d}>{d}</MenuItem>
+                ))}
+              </TextField>
               <Chip
                 size="small" variant="outlined"
-                label={`${layout.dpi ?? 300} DPI · native ${layout.width}×${layout.height}px`}
+                label={`${Math.round(layout.width / (layout.dpi ?? 300) * 25.4)} × ${Math.round(layout.height / (layout.dpi ?? 300) * 25.4)} mm at print`}
               />
               {layout.background_image && (
                 <>
@@ -363,7 +372,11 @@ function CanvasEditor({
 function BackgroundImageNode({
   url, locked, x, y, width, height, onResize,
 }: { url: string; locked: boolean; x: number; y: number; width: number; height: number; onResize: (w: number, h: number) => void }) {
-  const [img] = useImage(url, 'anonymous');
+  // Do NOT request the image as CORS-anonymous — R2's default responses have
+  // no Access-Control-Allow-Origin header, which makes anonymous fetches
+  // fail. The canvas will be "tainted" (we can't read pixels back), which
+  // is fine because the editor never calls toDataURL on it.
+  const [img] = useImage(url);
   if (!img) return null;
   return (
     <KImage

@@ -13,6 +13,7 @@ import type { BulkImportPreview, BulkImportCommitResult, School } from '@/types'
 
 const STUDENT_FIELDS = [
   '', 'name', 'father_name', 'mother_name', 'enrollment_no', 'roll_no',
+  'class_name', 'section_name',
   'dob', 'blood_group', 'gender', 'address', 'mobile', 'enrolled_year', 'photo_hint',
 ];
 
