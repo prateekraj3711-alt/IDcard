@@ -1,7 +1,11 @@
 package com.schoolapp.idcard.ui.camera
 
+import android.Manifest
 import android.content.Context
+import android.content.pm.PackageManager
 import android.net.Uri
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.camera.core.CameraSelector
 import androidx.camera.core.ImageCapture
 import androidx.camera.core.ImageCaptureException
@@ -46,9 +50,50 @@ fun CameraCaptureScreen(
     var capturedUri by remember { mutableStateOf<Uri?>(null) }
     val state by vm.state.collectAsState()
 
+    // Runtime CAMERA permission. Declared in the manifest but Android 6+
+    // still requires the user to grant it at runtime — without this the
+    // PreviewView stays black and no image is ever captured.
+    var hasCameraPermission by remember {
+        mutableStateOf(
+            ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA)
+                == PackageManager.PERMISSION_GRANTED
+        )
+    }
+    val permissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission(),
+        onResult = { granted -> hasCameraPermission = granted },
+    )
+    LaunchedEffect(Unit) {
+        if (!hasCameraPermission) {
+            permissionLauncher.launch(Manifest.permission.CAMERA)
+        }
+    }
+
     LaunchedEffect(state.done) { if (state.done) onDone() }
 
     Box(modifier = Modifier.fillMaxSize().background(Color.Black)) {
+        if (!hasCameraPermission) {
+            Column(
+                modifier = Modifier.align(Alignment.Center).padding(24.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+            ) {
+                Text(
+                    "Camera permission is required to take the student's photo.",
+                    color = Color.White,
+                    style = MaterialTheme.typography.bodyLarge,
+                )
+                Spacer(Modifier.height(16.dp))
+                Button(onClick = { permissionLauncher.launch(Manifest.permission.CAMERA) }) {
+                    Text("Grant camera access")
+                }
+                Spacer(Modifier.height(8.dp))
+                TextButton(onClick = onDone) {
+                    Text("Cancel", color = Color.White)
+                }
+            }
+            return@Box
+        }
+
         if (capturedUri == null) {
             AndroidView(
                 factory = { ctx ->
