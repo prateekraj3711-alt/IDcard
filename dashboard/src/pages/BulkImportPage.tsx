@@ -279,7 +279,7 @@ export function BulkImportPage() {
                         const resp = await fetch(u.put_url, {
                           method: 'PUT',
                           headers: u.required_headers,
-                          body: bytes,
+                          body: new Blob([bytes], { type: u.required_headers['Content-Type'] ?? 'application/octet-stream' }),
                         });
                         if (!resp.ok) throw new Error(`PUT ${file.name} failed (${resp.status})`);
                         recorded.push({
