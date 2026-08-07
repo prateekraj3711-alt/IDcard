@@ -7,6 +7,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.Logout
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.PersonOutline
 import androidx.compose.material.icons.filled.Sync
@@ -27,17 +28,26 @@ fun StudentListScreen(
     onAdd: () -> Unit,
     onOpen: (String) -> Unit,
     onSync: () -> Unit,
+    onLogout: () -> Unit,
     vm: StudentListViewModel = hiltViewModel(),
 ) {
     val students by vm.students.collectAsState()
+    val session by vm.session.collectAsState()
+    var confirmLogout by remember { mutableStateOf(false) }
     Scaffold(
         topBar = {
             BrandTopBar(
-                title = "Candidates",
-                subtitle = "${students.size} total",
+                title = session?.fullName?.takeIf { it.isNotBlank() } ?: "Candidates",
+                subtitle = when {
+                    session?.schoolName != null -> "${students.size} candidates · ${session?.schoolName}"
+                    else -> "${students.size} total"
+                },
                 actions = {
                     IconButton(onClick = onSync) {
                         Icon(Icons.Filled.Sync, contentDescription = "Sync status")
+                    }
+                    IconButton(onClick = { confirmLogout = true }) {
+                        Icon(Icons.AutoMirrored.Filled.Logout, contentDescription = "Sign out")
                     }
                 },
             )
@@ -66,6 +76,27 @@ fun StudentListScreen(
                 }
             }
         }
+    }
+
+    if (confirmLogout) {
+        AlertDialog(
+            onDismissRequest = { confirmLogout = false },
+            title = { Text("Sign out?") },
+            text = {
+                val who = session?.email ?: session?.fullName ?: "this account"
+                Text("You'll need to sign in again to continue as $who.")
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    confirmLogout = false
+                    vm.signOut()
+                    onLogout()
+                }) { Text("Sign out") }
+            },
+            dismissButton = {
+                TextButton(onClick = { confirmLogout = false }) { Text("Cancel") }
+            },
+        )
     }
 }
 

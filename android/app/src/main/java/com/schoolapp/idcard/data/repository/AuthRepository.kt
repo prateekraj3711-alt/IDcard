@@ -1,6 +1,7 @@
 package com.schoolapp.idcard.data.repository
 
 import com.schoolapp.idcard.data.remote.ApiService
+import com.schoolapp.idcard.data.remote.SessionInfo
 import com.schoolapp.idcard.data.remote.TokenStore
 import com.schoolapp.idcard.data.remote.dto.LoginRequestDto
 import com.schoolapp.idcard.data.remote.dto.TeacherSignupRequestDto
@@ -13,7 +14,18 @@ class AuthRepository @Inject constructor(
     private val api: ApiService,
     private val tokens: TokenStore,
 ) {
-    val isLoggedIn: Boolean get() = tokens.access != null
+    val isLoggedIn: Boolean get() = tokens.hasSession()
+    val currentSession: SessionInfo? get() = tokens.session()
+
+    private fun UserDto.toSession() = SessionInfo(
+        userId = id,
+        fullName = full_name,
+        email = email,
+        role = role,
+        schoolId = school?.id,
+        schoolCode = school?.code,
+        schoolName = school?.name,
+    )
 
     suspend fun login(schoolCode: String, identifier: String, password: String, deviceId: String): UserDto {
         // Route the identifier to the right server field. Backend accepts:
@@ -42,6 +54,7 @@ class AuthRepository @Inject constructor(
             )
         )
         tokens.save(resp.access_token, resp.refresh_token)
+        tokens.saveSession(resp.user.toSession())
         return resp.user
     }
 
@@ -64,6 +77,7 @@ class AuthRepository @Inject constructor(
             )
         )
         tokens.save(resp.access_token, resp.refresh_token)
+        tokens.saveSession(resp.user.toSession())
         return resp.user
     }
 
