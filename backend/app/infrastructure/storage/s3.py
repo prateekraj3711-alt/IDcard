@@ -8,6 +8,10 @@ from app.core.config import settings
 
 @lru_cache
 def get_s3_client():
+    # Cloudflare R2 quirks are handled by:
+    #  - addressing_style="path" (set via S3_USE_PATH_STYLE)
+    #  - presign_put() omits the SSE header when the endpoint is R2
+    #  - put_object calls elsewhere don't pass SSE, so they work as-is
     return boto3.client(
         "s3",
         endpoint_url=settings.s3_endpoint_url,
@@ -17,11 +21,6 @@ def get_s3_client():
         config=Config(
             signature_version="s3v4",
             s3={"addressing_style": "path" if settings.s3_use_path_style else "auto"},
-            # Cloudflare R2 rejects requests that include an SSE header, and it
-            # doesn't understand streaming-signed payloads either. Force normal
-            # SigV4 with a payload sha256 instead of STREAMING-AWS4-HMAC-SHA256.
-            request_checksum_calculation="when_required",
-            response_checksum_validation="when_required",
         ),
     )
 
