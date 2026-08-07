@@ -4,7 +4,7 @@ import re
 from datetime import datetime, timedelta, timezone
 from uuid import UUID
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
@@ -60,8 +60,15 @@ class AuthService:
         if not req.email and not req.phone:
             raise Validation("either email or phone is required")
 
+        # Case-insensitive + whitespace-tolerant. Codes are supposed to be
+        # stored uppercase (SchoolCreate.pattern enforces ^[A-Z0-9-]+$), but
+        # teachers type them however they want on the sign-up screen — and
+        # even a single trailing space would have blown the exact-match up.
+        code = req.school_code.strip().upper()
         school = (
-            await self.s.execute(select(School).where(School.code == req.school_code.strip()))
+            await self.s.execute(
+                select(School).where(func.upper(School.code) == code)
+            )
         ).scalar_one_or_none()
         if school is None or school.deleted_at is not None or not school.is_active:
             raise NotFound("school code not recognised")
@@ -140,8 +147,11 @@ class AuthService:
                     return found
             return None
         if req.username and req.school_code:
+            code = req.school_code.strip().upper()
             school = (
-                await self.s.execute(select(School).where(School.code == req.school_code))
+                await self.s.execute(
+                    select(School).where(func.upper(School.code) == code)
+                )
             ).scalar_one_or_none()
             if school is None:
                 return None

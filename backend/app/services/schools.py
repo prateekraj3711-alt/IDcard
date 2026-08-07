@@ -16,12 +16,19 @@ class SchoolService:
         self.s = session
 
     async def create(self, data: SchoolCreate) -> School:
+        # Normalize before insert so the sign-up code lookup never gets tripped
+        # by trailing whitespace or a stray lowercase character that slipped
+        # past the Pydantic pattern.
+        payload = data.model_dump()
+        payload["code"] = str(payload["code"]).strip().upper()
         exists = (
-            await self.s.execute(select(School).where(School.code == data.code))
+            await self.s.execute(
+                select(School).where(func.upper(School.code) == payload["code"])
+            )
         ).scalar_one_or_none()
         if exists:
-            raise Conflict(f"school code '{data.code}' already exists")
-        school = School(**data.model_dump())
+            raise Conflict(f"school code '{payload['code']}' already exists")
+        school = School(**payload)
         self.s.add(school)
         await self.s.commit()
         await self.s.refresh(school)
