@@ -13,6 +13,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.schoolapp.idcard.ui.components.BrandTopBar
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -35,8 +36,10 @@ fun StudentEditScreen(
 
     Scaffold(
         topBar = {
-            TopAppBar(
-                title = { Text(if (studentClientUuid == null) "New Candidate" else "Edit Candidate") },
+            BrandTopBar(
+                title = if (studentClientUuid == null) "New candidate" else "Edit candidate",
+                subtitle = "Draft saved locally until synced",
+                onNavigateBack = onSaved,
                 actions = {
                     TextButton(onClick = { vm.clearForm() }) {
                         Icon(Icons.Filled.Refresh, contentDescription = null)
@@ -47,6 +50,7 @@ fun StudentEditScreen(
             )
         },
         snackbarHost = { SnackbarHost(snackbarHostState) },
+        containerColor = MaterialTheme.colorScheme.background,
     ) { padding ->
         Column(
             modifier = Modifier
