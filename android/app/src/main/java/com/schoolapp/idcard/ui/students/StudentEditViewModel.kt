@@ -27,6 +27,7 @@ data class StudentEditUiState(
     val hasPhoto: Boolean = false,
     val error: String? = null,
     val saving: Boolean = false,
+    val savedOnce: Boolean = false,
 )
 
 @HiltViewModel
@@ -68,17 +69,24 @@ class StudentEditViewModel @Inject constructor(
     fun onMobile(v: String) = _state.update { it.copy(mobile = v) }
     fun onAddress(v: String) = _state.update { it.copy(address = v) }
 
+    fun clearForm() {
+        _state.value = StudentEditUiState()   // fresh UUID, empty fields
+    }
+
+    fun clearSavedFlag() = _state.update { it.copy(savedOnce = false) }
+
     fun save(submit: Boolean, onDone: () -> Unit) {
         val s = _state.value
         if (s.name.isBlank() || s.enrollmentNo.isBlank()) {
-            _state.update { it.copy(error = "Name and enrollment number required") }; return
+            _state.update { it.copy(error = "Name and enrollment number are required") }
+            return
         }
         _state.update { it.copy(saving = true) }
         viewModelScope.launch {
             repo.saveDraft(
                 StudentEntity(
                     clientUuid = s.clientUuid,
-                    schoolId = s.schoolId,   // hydrated from logged-in user in real code
+                    schoolId = s.schoolId,
                     enrollmentNo = s.enrollmentNo,
                     name = s.name,
                     rollNo = s.rollNo,
@@ -92,6 +100,7 @@ class StudentEditViewModel @Inject constructor(
                 ),
                 submit = submit,
             )
+            _state.update { it.copy(saving = false, savedOnce = submit) }
             onDone()
         }
     }
