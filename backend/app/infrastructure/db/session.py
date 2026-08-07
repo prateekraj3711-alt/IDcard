@@ -15,18 +15,21 @@ from app.core.config import settings
 
 
 def _connect_args() -> dict:
-    """Provider-aware asyncpg tuning.
+    """asyncpg connect kwargs — must ONLY contain arguments asyncpg.connect()
+    itself accepts. SQLAlchemy-dialect-level params like
+    ``prepared_statement_cache_size`` are handled below via the engine
+    constructor, not here — passing them to asyncpg raises TypeError.
 
-    - TLS: cloud Postgres (Neon, Supabase, Cockroach Cloud, Aiven, Render)
-      requires SSL. asyncpg doesn't read libpq's `sslmode=` URL param, so
-      we pass `ssl="require"` explicitly when the host looks cloud-shaped.
-    - Statement cache: Supabase's *transaction pooler* (pgbouncer in
-      transaction mode, port 6543 or a `pooler.supabase.com` host) doesn't
-      hold a Postgres backend across statements, so asyncpg's server-side
-      prepared statement cache goes stale mid-query and blows up with
-      "prepared statement does not exist". Disable both caches when we
-      see that pooler; the *session pooler* keeps caches on because it
-      holds a backend for the whole session.
+    TLS: cloud Postgres (Neon, Supabase, Cockroach Cloud, Aiven, Render)
+    requires SSL. asyncpg doesn't read libpq's ``sslmode=`` URL param, so
+    we pass ``ssl="require"`` explicitly when the host looks cloud-shaped.
+
+    statement_cache_size: Supabase's *transaction pooler* (pgbouncer in
+    transaction mode, port 6543) doesn't hold a Postgres backend across
+    statements, so asyncpg's server-side prepared statement cache goes
+    stale mid-query and errors with ``prepared statement does not exist``.
+    Zero it out on that pooler; the session pooler keeps it on because
+    the backend sticks for the session.
     """
     url = settings.database_url.lower()
     args: dict = {}
@@ -42,17 +45,29 @@ def _connect_args() -> dict:
     if any(m in url for m in cloud_markers):
         args["ssl"] = "require"
 
-    # Supabase transaction pooler → pgbouncer transaction mode.
-    is_supabase_tx_pooler = (
-        "pooler.supabase.com" in url and ":6543" in url
-    ) or (
-        "supabase.co" in url and ":6543" in url
-    )
-    if is_supabase_tx_pooler:
+    if _is_supabase_tx_pooler(url):
         args["statement_cache_size"] = 0
-        args["prepared_statement_cache_size"] = 0
 
     return args
+
+
+def _is_supabase_tx_pooler(url: str) -> bool:
+    return ("pooler.supabase.com" in url and ":6543" in url) or (
+        "supabase.co" in url and ":6543" in url
+    )
+
+
+def _dialect_kwargs() -> dict:
+    """Engine-level kwargs that are NOT part of asyncpg's connect signature.
+
+    ``prepared_statement_cache_size`` is a SQLAlchemy asyncpg-dialect
+    parameter; setting it to 0 alongside the asyncpg-level statement cache
+    fully disables prepared-statement reuse for pgbouncer transaction mode.
+    """
+    kwargs: dict = {}
+    if _is_supabase_tx_pooler(settings.database_url.lower()):
+        kwargs["prepared_statement_cache_size"] = 0
+    return kwargs
 
 
 engine = create_async_engine(
@@ -60,6 +75,7 @@ engine = create_async_engine(
     poolclass=NullPool,
     future=True,
     connect_args=_connect_args(),
+    **_dialect_kwargs(),
 )
 
 SessionLocal = async_sessionmaker(engine, expire_on_commit=False, class_=AsyncSession)

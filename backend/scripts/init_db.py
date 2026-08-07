@@ -27,8 +27,7 @@ async def main() -> None:
     print(f"→ Connecting to {settings.database_url.rsplit('@', 1)[-1]}")
     for ext in ("pg_trgm", "citext"):
         try:
-            async with engine.connect() as conn:
-                await conn.execution_options(isolation_level="AUTOCOMMIT")
+            async with engine.begin() as conn:
                 await conn.execute(text(f'CREATE EXTENSION IF NOT EXISTS "{ext}"'))
         except Exception as exc:  # noqa: BLE001
             print(f"  ↷ skip extension {ext}: {type(exc).__name__}")

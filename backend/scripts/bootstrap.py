@@ -27,12 +27,16 @@ async def _init_schema() -> None:
     # Postgres extensions we used to rely on (pg_trgm, citext). CockroachDB
     # doesn't ship either — the models now use a LowerText TypeDecorator that
     # simulates CITEXT in application code, so failing to CREATE EXTENSION
-    # is not fatal. Do each in its own autocommit connection so a single
-    # failure doesn't poison the transaction that follows.
+    # is not fatal. Each attempt runs in its own `engine.begin()` block; if
+    # the CREATE fails, the transaction rolls back cleanly and the next
+    # iteration gets a fresh connection from the pool.
+    #
+    # NOTE: we deliberately do NOT flip isolation_level to AUTOCOMMIT
+    # mid-connection here — on asyncpg that triggers a sync reconnect
+    # inside SQLAlchemy's pool checkout which fails with MissingGreenlet.
     for ext in ("pg_trgm", "citext"):
         try:
-            async with engine.connect() as conn:
-                await conn.execution_options(isolation_level="AUTOCOMMIT")
+            async with engine.begin() as conn:
                 await conn.execute(text(f'CREATE EXTENSION IF NOT EXISTS "{ext}"'))
         except Exception as exc:  # noqa: BLE001
             print(f"[bootstrap] skip extension {ext}: {type(exc).__name__}")
