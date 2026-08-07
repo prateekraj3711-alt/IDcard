@@ -23,9 +23,15 @@ export function TeachersPage() {
     queryFn: () => SchoolsApi.list({ page: 1, page_size: 100 }),
   });
 
-  const { data: teachers, isLoading } = useQuery({
+  const {
+    data: teachers,
+    isLoading,
+    error: teachersError,
+    refetch: refetchTeachers,
+  } = useQuery({
     queryKey: ['teachers', schoolId || 'all'],
     queryFn: () => TeachersApi.list(schoolId || undefined),
+    retry: 1,
   });
 
   const createTeacher = useMutation({
@@ -86,6 +92,20 @@ export function TeachersPage() {
           </Button>
         </Stack>
       </Stack>
+
+      {teachersError && (
+        <Alert
+          severity="error"
+          sx={{ mb: 2 }}
+          action={<Button size="small" onClick={() => refetchTeachers()}>Retry</Button>}
+        >
+          Couldn't load teachers: {
+            ((teachersError as { response?: { data?: { detail?: string } }; message?: string }).response?.data?.detail)
+              ?? (teachersError as { message?: string }).message
+              ?? 'unknown error'
+          }
+        </Alert>
+      )}
 
       <div style={{ height: 600, background: 'white' }}>
         <DataGrid
