@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import {
   Alert, Box, Button, Card, CardContent, Chip, LinearProgress, MenuItem, Stack, TextField, Typography,
@@ -24,13 +24,16 @@ export function GenerateIdCardsPage() {
     queryFn: () => TemplatesApi.list({ module }),
   });
 
-  useQuery({
+  const pollQuery = useQuery({
     queryKey: ['id-card-job', job?.id],
     queryFn: () => IdCardJobsApi.get(job!.id),
     enabled: !!job && job.status !== 'done' && job.status !== 'failed',
     refetchInterval: 2000,
-    onSuccess: (j) => setJob(j),
-  } as never);
+  });
+
+  useEffect(() => {
+    if (pollQuery.data) setJob(pollQuery.data);
+  }, [pollQuery.data]);
 
   const create = useMutation({
     mutationFn: () => IdCardJobsApi.create({

@@ -1,7 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { useParams } from 'react-router-dom';
 import { Box, Card, CardContent, Grid, Typography, Avatar, Divider, Button, Stack } from '@mui/material';
-import QRCode from 'qrcode.react';
+import { QRCodeSVG as QRCode } from 'qrcode.react';
 import { StudentsApi } from '@/api/endpoints';
 
 export function StudentProfilePage() {

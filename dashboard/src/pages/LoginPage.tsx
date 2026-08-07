@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, type FormEvent } from 'react';
 import { Box, Button, Card, CardContent, Stack, TextField, Typography, Alert } from '@mui/material';
 import { useNavigate } from 'react-router-dom';
 import { AuthApi } from '@/api/endpoints';
@@ -12,7 +12,7 @@ export function LoginPage() {
   const { setTokens, setUser } = useAuth();
   const nav = useNavigate();
 
-  const submit = async (e: React.FormEvent) => {
+  const submit = async (e: FormEvent) => {
     e.preventDefault();
     setLoading(true); setError(null);
     try {

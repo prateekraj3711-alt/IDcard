@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import {
   Alert, Box, Button, Card, CardContent, Chip, MenuItem, Paper, Stack, Step, StepLabel, Stepper,
@@ -182,7 +182,7 @@ export function BulkImportPage() {
   );
 }
 
-function Metric({ label, value }: { label: string; value: React.ReactNode }) {
+function Metric({ label, value }: { label: string; value: ReactNode }) {
   return (
     <Box>
       <Typography variant="caption" color="text.secondary">{label}</Typography>
