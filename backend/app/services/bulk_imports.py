@@ -95,7 +95,7 @@ class BulkImportService:
                 BulkImportRow(
                     bulk_import_id=imp.id,
                     row_index=i + 1,
-                    raw=raw,
+                    raw=_json_safe(raw),
                 )
             )
         await self.s.commit()
@@ -230,10 +230,10 @@ class BulkImportService:
         imported, failed = 0, 0
         for row in rows:
             mapped, errors = self._map_row(row.raw, mapping)
-            row.mapped = mapped
+            row.mapped = _json_safe(mapped)
             if errors:
                 row.status = BulkImportRowStatus.invalid
-                row.errors = errors
+                row.errors = _json_safe(errors)
                 failed += 1
                 continue
 
@@ -291,7 +291,7 @@ class BulkImportService:
                     .where(BulkImportRow.id == row.id)
                     .values(
                         status=BulkImportRowStatus.failed,
-                        errors=[{"code": "db_error", "message": str(exc)}],
+                        errors=_json_safe([{"code": "db_error", "message": str(exc)}]),
                     )
                 )
                 await self.s.commit()
@@ -504,6 +504,23 @@ def _iso_to_date(value: Any):
         return date.fromisoformat(str(value))
     except Exception:
         return None
+
+
+def _json_safe(obj: Any) -> Any:
+    """Recursively normalize a value for JSONB storage — datetime/date become
+    ISO strings, UUIDs become their str form, everything else passes through.
+    Defensive: any code path that leaves a non-JSON-native value in a dict
+    that lands in a JSONB column will fail the transaction and poison the
+    session. This guarantees we never trip that."""
+    if isinstance(obj, dict):
+        return {k: _json_safe(v) for k, v in obj.items()}
+    if isinstance(obj, (list, tuple)):
+        return [_json_safe(v) for v in obj]
+    if isinstance(obj, datetime):
+        return obj.isoformat()
+    if isinstance(obj, date):
+        return obj.isoformat()
+    return obj
 
 
 def _is_image(name: str) -> bool:
