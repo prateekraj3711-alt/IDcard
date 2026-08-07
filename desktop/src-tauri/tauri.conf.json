@@ -1,0 +1,58 @@
+{
+  "$schema": "https://schema.tauri.app/config/1",
+  "build": {
+    "beforeBuildCommand": "npm run build:web",
+    "beforeDevCommand": "",
+    "devPath": "http://localhost:5173",
+    "distDir": "../../dashboard/dist",
+    "withGlobalTauri": true
+  },
+  "package": {
+    "productName": "Stark ID",
+    "version": "0.1.0"
+  },
+  "tauri": {
+    "allowlist": {
+      "all": false,
+      "shell": { "all": false, "open": true },
+      "dialog": { "all": true },
+      "fs": {
+        "all": true,
+        "scope": ["$HOME/**", "$DOCUMENT/**", "$DOWNLOAD/**", "$DESKTOP/**", "$APP/**", "$TEMP/**"]
+      },
+      "path": { "all": true },
+      "os": { "all": true }
+    },
+    "bundle": {
+      "active": true,
+      "targets": ["msi", "dmg", "appimage", "deb"],
+      "identifier": "com.starkindustries.idcard",
+      "icon": [
+        "icons/32x32.png",
+        "icons/128x128.png",
+        "icons/128x128@2x.png",
+        "icons/icon.icns",
+        "icons/icon.ico"
+      ],
+      "resources": [],
+      "copyright": "© Stark Industries",
+      "category": "Productivity",
+      "shortDescription": "Student & Employee ID admin — desktop edition",
+      "longDescription": "Native desktop wrapper for the Stark Industries ID platform. Reads photo folders and generates ID cards locally so no bytes leave the operator's machine until they choose to sync."
+    },
+    "security": {
+      "csp": null
+    },
+    "windows": [
+      {
+        "title": "Stark ID",
+        "width": 1280,
+        "height": 800,
+        "minWidth": 960,
+        "minHeight": 640,
+        "resizable": true,
+        "fullscreen": false
+      }
+    ]
+  }
+}

@@ -1,25 +1,19 @@
 from collections.abc import AsyncGenerator
 
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
+from sqlalchemy.pool import NullPool
 
 from app.core.config import settings
 
-# NOTE on Neon compatibility:
-# - pool_pre_ping=True triggers a sync ping() on checkout, which calls
-#   await_only(_async_ping()) internally. That's fine when we're already
-#   inside a greenlet_spawn (i.e. AsyncSession operations), but a stale
-#   connection surfaces MissingGreenlet from certain code paths (long
-#   sync work inside the async request — e.g. the photo-ZIP upload).
-# - Neon closes idle connections after ~5 minutes. Instead of pinging,
-#   we recycle every 3 minutes so we never keep one long enough to go
-#   stale.
+# NullPool opens a fresh asyncpg connection per checkout and closes it on
+# return. It removes every stale-connection failure mode we've been chasing:
+#   - pool_pre_ping triggering MissingGreenlet on Neon-idled connections
+#   - pool_recycle races where a connection was fine on borrow but died mid-tx
+#   - Render free-tier processes with only 1 worker anyway
+# The extra ~5–15 ms per request against Neon is a fine trade for reliability.
 engine = create_async_engine(
     settings.database_url,
-    pool_size=settings.database_pool_size,
-    max_overflow=settings.database_max_overflow,
-    pool_pre_ping=False,
-    pool_recycle=180,
-    pool_timeout=30,
+    poolclass=NullPool,
     future=True,
 )
 

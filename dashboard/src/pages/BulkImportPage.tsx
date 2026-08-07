@@ -8,7 +8,9 @@ import {
 import CloudUploadIcon from '@mui/icons-material/CloudUpload';
 import PhotoLibraryIcon from '@mui/icons-material/PhotoLibrary';
 import AddIcon from '@mui/icons-material/Add';
+import ComputerIcon from '@mui/icons-material/Computer';
 import { SchoolsApi, BulkImportsApi } from '@/api/endpoints';
+import { isDesktop, pickFolder, listFolder } from '@/desktopBridge';
 import type { BulkImportPreview, BulkImportCommitResult, School } from '@/types';
 
 const STUDENT_FIELDS = [
@@ -28,6 +30,9 @@ export function BulkImportPage() {
   const [photoStats, setPhotoStats] = useState<{ photos_uploaded: number; photos_matched: number } | null>(null);
   const [commitResult, setCommitResult] = useState<BulkImportCommitResult | null>(null);
   const [newSchoolOpen, setNewSchoolOpen] = useState(false);
+  const desktop = isDesktop();
+  const [localFolder, setLocalFolder] = useState<string | null>(null);
+  const [localPhotoCount, setLocalPhotoCount] = useState<number | null>(null);
 
   const { data: schools } = useQuery({
     queryKey: ['schools', 'select'],
@@ -184,17 +189,39 @@ export function BulkImportPage() {
       {step === 3 && preview && (
         <Card>
           <CardContent>
-            <Typography variant="h6" sx={{ mb: 1 }}>Upload photo folder</Typography>
+            <Typography variant="h6" sx={{ mb: 1 }}>Attach photos</Typography>
             <Alert severity="info" sx={{ mb: 2 }}>
-              ZIP up the photos folder. Each file's stem (name without extension) must match the enrollment number.
+              Each photo's filename (without extension) must match the enrollment number.
               <br /><em>Example: <code>DPS2025-0421.jpg</code> → matches candidate <code>DPS2025-0421</code>.</em>
             </Alert>
-            <Stack direction="row" spacing={2}>
+
+            {desktop && (
+              <Alert severity="success" sx={{ mb: 2 }}>
+                Desktop mode detected — you can point at a local folder instead of zipping it up.
+                Photos stream directly to R2 from your machine.
+              </Alert>
+            )}
+
+            <Stack direction={{ xs: 'column', md: 'row' }} spacing={2}>
+              {desktop && (
+                <Button
+                  variant="contained" size="large" startIcon={<ComputerIcon />}
+                  onClick={async () => {
+                    const folder = await pickFolder();
+                    if (!folder) return;
+                    setLocalFolder(folder);
+                    const files = await listFolder(folder, ['jpg', 'jpeg', 'png']);
+                    setLocalPhotoCount(files.length);
+                  }}
+                >
+                  {localFolder ? 'Change folder' : 'Pick photo folder'}
+                </Button>
+              )}
               <Button
-                variant="contained" component="label" size="large"
+                variant={desktop ? 'outlined' : 'contained'} component="label" size="large"
                 startIcon={<PhotoLibraryIcon />} disabled={uploadPhotos.isPending}
               >
-                {uploadPhotos.isPending ? 'Uploading…' : 'Choose ZIP'}
+                {uploadPhotos.isPending ? 'Uploading…' : desktop ? 'Or upload a ZIP' : 'Choose ZIP'}
                 <input
                   hidden type="file" accept=".zip"
                   onChange={(e) => { const f = e.target.files?.[0]; if (f) uploadPhotos.mutate(f); }}
@@ -204,6 +231,15 @@ export function BulkImportPage() {
               <Box sx={{ flexGrow: 1 }} />
               <Button onClick={() => setStep(2)}>Back</Button>
             </Stack>
+
+            {localFolder && localPhotoCount !== null && (
+              <Alert severity="info" sx={{ mt: 2 }}>
+                Selected: <code>{localFolder}</code> — {localPhotoCount} image files found.
+                <br />
+                <em>Local streaming upload is coming in the next build; for now this preview only.
+                Continue to commit and use ZIP fallback for actual attachment.</em>
+              </Alert>
+            )}
             {uploadPhotos.isPending && <LinearProgress sx={{ mt: 2 }} />}
           </CardContent>
         </Card>

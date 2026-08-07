@@ -1,0 +1,85 @@
+name: Desktop — build installers
+
+on:
+  push:
+    tags: ["desktop-v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: windows-latest
+            target: msi
+            artifact: "*.msi"
+          - platform: macos-latest
+            target: dmg
+            artifact: "*.dmg"
+          - platform: ubuntu-22.04
+            target: appimage
+            artifact: "*.AppImage"
+
+    runs-on: ${{ matrix.platform }}
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Ubuntu deps
+        if: matrix.platform == 'ubuntu-22.04'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.0-dev libssl-dev libgtk-3-dev libayatana-appindicator3-dev librsvg2-dev patchelf
+
+      - name: Cache Cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            desktop/src-tauri/target
+          key: cargo-${{ matrix.platform }}-${{ hashFiles('desktop/src-tauri/Cargo.toml') }}
+
+      - name: Install dashboard deps
+        working-directory: dashboard
+        run: npm install --no-audit --no-fund
+
+      - name: Build dashboard
+        working-directory: dashboard
+        env:
+          VITE_API_BASE_URL: https://idcard-api-ppti.onrender.com/api/v1
+        run: npm run build
+
+      - name: Install desktop deps
+        working-directory: desktop
+        run: npm install --no-audit --no-fund
+
+      - name: Build Tauri app
+        working-directory: desktop
+        run: npx tauri build
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: stark-id-${{ matrix.target }}
+          path: desktop/src-tauri/target/release/bundle/**/${{ matrix.artifact }}
+          if-no-files-found: warn
+
+      - name: Attach to release (on tag)
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: desktop/src-tauri/target/release/bundle/**/${{ matrix.artifact }}
+          generate_release_notes: true
