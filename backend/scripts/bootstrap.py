@@ -24,9 +24,20 @@ from app.infrastructure.db.session import SessionLocal, engine
 
 
 async def _init_schema() -> None:
+    # Postgres extensions we used to rely on (pg_trgm, citext). CockroachDB
+    # doesn't ship either — the models now use a LowerText TypeDecorator that
+    # simulates CITEXT in application code, so failing to CREATE EXTENSION
+    # is not fatal. Do each in its own autocommit connection so a single
+    # failure doesn't poison the transaction that follows.
+    for ext in ("pg_trgm", "citext"):
+        try:
+            async with engine.connect() as conn:
+                await conn.execution_options(isolation_level="AUTOCOMMIT")
+                await conn.execute(text(f'CREATE EXTENSION IF NOT EXISTS "{ext}"'))
+        except Exception as exc:  # noqa: BLE001
+            print(f"[bootstrap] skip extension {ext}: {type(exc).__name__}")
+
     async with engine.begin() as conn:
-        for ext in ("pg_trgm", "citext"):
-            await conn.execute(text(f'CREATE EXTENSION IF NOT EXISTS "{ext}"'))
         await conn.run_sync(Base.metadata.create_all)
     print("[bootstrap] schema ok")
 

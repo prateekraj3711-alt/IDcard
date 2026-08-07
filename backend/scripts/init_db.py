@@ -25,9 +25,14 @@ from app.infrastructure.db.session import engine
 
 async def main() -> None:
     print(f"→ Connecting to {settings.database_url.rsplit('@', 1)[-1]}")
+    for ext in ("pg_trgm", "citext"):
+        try:
+            async with engine.connect() as conn:
+                await conn.execution_options(isolation_level="AUTOCOMMIT")
+                await conn.execute(text(f'CREATE EXTENSION IF NOT EXISTS "{ext}"'))
+        except Exception as exc:  # noqa: BLE001
+            print(f"  ↷ skip extension {ext}: {type(exc).__name__}")
     async with engine.begin() as conn:
-        for ext in ("pg_trgm", "citext"):
-            await conn.execute(text(f'CREATE EXTENSION IF NOT EXISTS "{ext}"'))
         await conn.run_sync(Base.metadata.create_all)
     print("✓ Schema created (or already up-to-date)")
     await engine.dispose()

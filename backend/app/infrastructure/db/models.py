@@ -18,8 +18,34 @@ from sqlalchemy import (
     UniqueConstraint,
     func,
 )
-from sqlalchemy.dialects.postgresql import CITEXT, INET, JSONB, UUID as PG_UUID
+from sqlalchemy.dialects.postgresql import JSONB, UUID as PG_UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
+from sqlalchemy.types import TypeDecorator
+
+
+class LowerText(TypeDecorator):
+    """Portable stand-in for Postgres CITEXT — stores strings lowercased so
+    equality lookups behave case-insensitively. Works everywhere String does
+    (CockroachDB, plain Postgres, SQLite in tests), no extension required."""
+
+    impl = String
+    cache_ok = True
+
+    def process_bind_param(self, value, dialect):  # noqa: ARG002
+        if isinstance(value, str):
+            return value.lower()
+        return value
+
+
+class IpAddress(TypeDecorator):
+    """CockroachDB doesn't ship the Postgres INET type, so store IPs as short
+    strings. 45 chars covers the longest IPv4-mapped IPv6 form."""
+
+    impl = String
+    cache_ok = True
+
+    def __init__(self):
+        super().__init__(length=45)
 
 from app.infrastructure.db.base import Base, SoftDelete, Timestamped, UUIDPK
 
@@ -94,7 +120,7 @@ class School(Base, UUIDPK, Timestamped, SoftDelete):
     state: Mapped[str | None] = mapped_column(String(100))
     pincode: Mapped[str | None] = mapped_column(String(10))
     phone: Mapped[str | None] = mapped_column(String(20))
-    email: Mapped[str | None] = mapped_column(CITEXT)
+    email: Mapped[str | None] = mapped_column(LowerText())
     logo_url: Mapped[str | None] = mapped_column(Text)
     principal_name: Mapped[str | None] = mapped_column(String(100))
     is_active: Mapped[bool] = mapped_column(Boolean, server_default="true", nullable=False)
@@ -107,8 +133,8 @@ class School(Base, UUIDPK, Timestamped, SoftDelete):
 class User(Base, UUIDPK, Timestamped, SoftDelete):
     __tablename__ = "users"
 
-    email: Mapped[str] = mapped_column(CITEXT, unique=True, nullable=False)
-    username: Mapped[str | None] = mapped_column(CITEXT, unique=True)
+    email: Mapped[str] = mapped_column(LowerText(), unique=True, nullable=False)
+    username: Mapped[str | None] = mapped_column(LowerText(), unique=True)
     password_hash: Mapped[str] = mapped_column(Text, nullable=False)
     full_name: Mapped[str] = mapped_column(String(150), nullable=False)
     role: Mapped[UserRole] = mapped_column(Enum(UserRole, name="user_role"), nullable=False)
@@ -240,7 +266,7 @@ class AuditLog(Base, UUIDPK):
     entity_type: Mapped[str] = mapped_column(String(50), nullable=False)
     entity_id: Mapped[UUID | None] = mapped_column(PG_UUID(as_uuid=True))
     diff: Mapped[dict | None] = mapped_column(JSONB)
-    ip: Mapped[str | None] = mapped_column(INET)
+    ip: Mapped[str | None] = mapped_column(IpAddress())
     user_agent: Mapped[str | None] = mapped_column(Text)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
@@ -256,7 +282,7 @@ class RefreshToken(Base, UUIDPK, Timestamped):
     token_hash: Mapped[str] = mapped_column(String(64), nullable=False)
     device_id: Mapped[str | None] = mapped_column(String(128))
     user_agent: Mapped[str | None] = mapped_column(Text)
-    ip: Mapped[str | None] = mapped_column(INET)
+    ip: Mapped[str | None] = mapped_column(IpAddress())
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 

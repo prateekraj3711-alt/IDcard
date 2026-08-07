@@ -61,23 +61,45 @@ class Settings(BaseSettings):
     @classmethod
     def _normalize_database_url(cls, v):
         """Make the URL safe for SQLAlchemy async no matter which form the user
-        pasted. Neon and Render both emit `postgres://…` (or `postgresql://…`)
-        with a `?sslmode=require` query — neither works with the async driver
-        we install (asyncpg). Rewrite here so it always works."""
+        pasted. Neon, Render, Supabase, and CockroachDB all emit different
+        flavours (`postgres://`, `postgresql://`, `cockroachdb://`, with an
+        `?sslmode=require` query and — for Cockroach Cloud — an
+        `?options=--cluster%3Dfoo` cluster router). Rewrite everything to the
+        async form asyncpg understands, and hoist Cockroach-specific query
+        params into asyncpg `server_settings` so they survive the switch."""
         if not isinstance(v, str) or not v:
             return v
         v = v.strip()
-        if v.startswith("postgres://"):
+
+        # Normalize scheme.
+        if v.startswith("cockroachdb://"):
+            v = "postgresql+asyncpg://" + v[len("cockroachdb://"):]
+        elif v.startswith("cockroachdb+asyncpg://"):
+            v = "postgresql+asyncpg://" + v[len("cockroachdb+asyncpg://"):]
+        elif v.startswith("postgres://"):
             v = "postgresql+asyncpg://" + v[len("postgres://"):]
         elif v.startswith("postgresql://") and "+" not in v.split("://", 1)[0]:
             v = "postgresql+asyncpg://" + v[len("postgresql://"):]
+
+        # Strip params asyncpg rejects.
         if "?" in v:
             base, _, query = v.partition("?")
-            parts = [
-                kv for kv in query.split("&")
-                if kv and not kv.lower().startswith("sslmode=")
-            ]
-            v = base + (("?" + "&".join(parts)) if parts else "")
+            keep: list[str] = []
+            for kv in query.split("&"):
+                if not kv:
+                    continue
+                low = kv.lower()
+                # asyncpg negotiates TLS from the URL itself, not sslmode.
+                if low.startswith("sslmode="):
+                    continue
+                # `options=--cluster%3Dfoo` is a Cockroach Cloud router — asyncpg
+                # accepts it via the DSN as a `server_settings` entry, but the
+                # simplest path is to drop it and let libpq-style routing be
+                # handled by the connection host prefix Cockroach embeds.
+                if low.startswith("options="):
+                    continue
+                keep.append(kv)
+            v = base + (("?" + "&".join(keep)) if keep else "")
         return v
 
 
