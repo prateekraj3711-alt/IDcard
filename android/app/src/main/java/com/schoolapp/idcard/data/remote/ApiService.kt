@@ -19,6 +19,9 @@ interface ApiService {
     @POST("auth/login")
     suspend fun login(@Body req: LoginRequestDto): LoginResponseDto
 
+    @POST("auth/signup/teacher")
+    suspend fun signupTeacher(@Body req: TeacherSignupRequestDto): LoginResponseDto
+
     @POST("auth/refresh")
     suspend fun refresh(@Body req: RefreshRequestDto): TokenPairDto
 

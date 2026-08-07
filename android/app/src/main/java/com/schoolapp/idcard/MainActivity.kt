@@ -11,6 +11,7 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import com.schoolapp.idcard.ui.auth.LoginScreen
+import com.schoolapp.idcard.ui.auth.SignupScreen
 import com.schoolapp.idcard.ui.camera.CameraCaptureScreen
 import com.schoolapp.idcard.ui.students.StudentEditScreen
 import com.schoolapp.idcard.ui.students.StudentListScreen
@@ -29,9 +30,22 @@ class MainActivity : ComponentActivity() {
                     val nav = rememberNavController()
                     NavHost(navController = nav, startDestination = "login") {
                         composable("login") {
-                            LoginScreen(onSuccess = {
-                                nav.navigate("students") { popUpTo("login") { inclusive = true } }
-                            })
+                            LoginScreen(
+                                onSuccess = {
+                                    nav.navigate("students") { popUpTo("login") { inclusive = true } }
+                                },
+                                onSignUp = { nav.navigate("signup") },
+                            )
+                        }
+                        composable("signup") {
+                            SignupScreen(
+                                onSuccess = {
+                                    nav.navigate("students") {
+                                        popUpTo("login") { inclusive = true }
+                                    }
+                                },
+                                onBackToLogin = { nav.popBackStack() },
+                            )
                         }
                         composable("students") {
                             StudentListScreen(

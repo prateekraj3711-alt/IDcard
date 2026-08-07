@@ -61,6 +61,18 @@ class RefreshRequest(BaseModel):
     device_id: str | None = None
 
 
+class TeacherSignupRequest(BaseModel):
+    """Public teacher self-registration. School code acts as the gate —
+    the super admin issues it out-of-band. Users need one of email or phone
+    (they can also log in with either)."""
+    school_code: str = Field(min_length=2, max_length=32)
+    full_name: str = Field(min_length=2, max_length=150)
+    email: EmailStr | None = None
+    phone: str | None = None
+    password: str = Field(min_length=8, max_length=128)
+    device_id: str | None = None
+
+
 class SchoolCreate(BaseModel):
     code: str = Field(min_length=2, max_length=16, pattern=r"^[A-Z0-9-]+$")
     name: str

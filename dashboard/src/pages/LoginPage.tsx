@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from 'react';
+import { useMemo, useState, type FormEvent } from 'react';
 import { Alert, Box, Button, Card, CardContent, Stack, TextField, Typography } from '@mui/material';
 import { useNavigate } from 'react-router-dom';
 import { AuthApi } from '@/api/endpoints';
@@ -12,6 +12,15 @@ function classifyIdentifier(raw: string): { email?: string; phone?: string } {
   return { phone: s };
 }
 
+function greeting(): string {
+  const h = new Date().getHours();
+  if (h < 5) return 'Good night';
+  if (h < 12) return 'Good morning';
+  if (h < 17) return 'Good afternoon';
+  if (h < 21) return 'Good evening';
+  return 'Good night';
+}
+
 export function LoginPage() {
   const [identifier, setIdentifier] = useState('');
   const [password, setPassword] = useState('');
@@ -19,6 +28,7 @@ export function LoginPage() {
   const [error, setError] = useState<string | null>(null);
   const { setTokens, setUser } = useAuth();
   const nav = useNavigate();
+  const hello = useMemo(() => `${greeting()} — welcome to ${BRAND_NAME}`, []);
 
   const submit = async (e: FormEvent) => {
     e.preventDefault();
@@ -77,7 +87,7 @@ export function LoginPage() {
         <Card sx={{ p: 1 }}>
           <CardContent>
             <Typography variant="h5" sx={{ fontWeight: 700, mb: 0.5 }}>
-              Welcome to {BRAND_NAME}!
+              {hello}!
             </Typography>
             <Typography variant="body2" sx={{ mb: 3 }}>
               Sign in to the super admin portal to manage schools, teachers, and ID cards.

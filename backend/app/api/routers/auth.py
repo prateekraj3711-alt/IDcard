@@ -2,7 +2,15 @@ from fastapi import APIRouter, Depends, Header, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import CurrentUser, get_current_user
-from app.domain.schemas import LoginRequest, LoginResponse, RefreshRequest, SchoolMini, TokenPair, UserOut
+from app.domain.schemas import (
+    LoginRequest,
+    LoginResponse,
+    RefreshRequest,
+    SchoolMini,
+    TeacherSignupRequest,
+    TokenPair,
+    UserOut,
+)
 from app.infrastructure.db.session import get_session
 from app.services.auth import AuthService
 
@@ -27,6 +35,27 @@ async def login(
             email=user.email,
             role=user.role,
             school=school,
+        ),
+    )
+
+
+@router.post("/signup/teacher", response_model=LoginResponse, status_code=201)
+async def signup_teacher(
+    req: TeacherSignupRequest,
+    request: Request,
+    user_agent: str | None = Header(default=None),
+    session: AsyncSession = Depends(get_session),
+):
+    ip = request.client.host if request.client else None
+    user, pair = await AuthService(session).signup_teacher(req, ip, user_agent)
+    # Refresh to pull the school relation.
+    from app.infrastructure.db.models import User
+    row = await session.get(User, user.id)
+    school = SchoolMini(id=row.school.id, code=row.school.code, name=row.school.name) if row.school else None
+    return LoginResponse(
+        **pair.model_dump(),
+        user=UserOut(
+            id=row.id, full_name=row.full_name, email=row.email, role=row.role, school=school,
         ),
     )
 

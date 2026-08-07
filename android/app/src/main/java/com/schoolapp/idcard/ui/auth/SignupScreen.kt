@@ -13,23 +13,17 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.platform.LocalContext
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.schoolapp.idcard.ui.theme.APP_TAGLINE
 import com.schoolapp.idcard.ui.theme.BRAND_NAME
-import com.schoolapp.idcard.util.buildGreeting
-import java.util.Calendar
 
 @Composable
-fun LoginScreen(
+fun SignupScreen(
     onSuccess: () -> Unit,
-    onSignUp: () -> Unit,
-    vm: LoginViewModel = hiltViewModel(),
+    onBackToLogin: () -> Unit,
+    vm: SignupViewModel = hiltViewModel(),
 ) {
     val state by vm.state.collectAsState()
-    val year = remember { Calendar.getInstance().get(Calendar.YEAR) }
-    val context = LocalContext.current
-    val greeting = remember { buildGreeting(context) }
 
     Column(
         modifier = Modifier
@@ -39,7 +33,6 @@ fun LoginScreen(
             .padding(horizontal = 24.dp, vertical = 32.dp),
         verticalArrangement = Arrangement.Center,
     ) {
-        // Brand row
         Row(
             verticalAlignment = Alignment.CenterVertically,
             modifier = Modifier.padding(bottom = 24.dp),
@@ -69,7 +62,6 @@ fun LoginScreen(
             }
         }
 
-        // Card container
         Card(
             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
             elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
@@ -77,41 +69,50 @@ fun LoginScreen(
             modifier = Modifier.fillMaxWidth(),
         ) {
             Column(modifier = Modifier.padding(24.dp)) {
-                Text(
-                    greeting,
-                    style = MaterialTheme.typography.headlineMedium,
-                )
+                Text("Create your account", style = MaterialTheme.typography.headlineMedium)
                 Spacer(Modifier.height(4.dp))
                 Text(
-                    "Sign in to add candidates for your school.",
+                    "Enter your school's code — your admin will have shared it. Fill in your details and pick a password.",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
-                Spacer(Modifier.height(24.dp))
+                Spacer(Modifier.height(20.dp))
 
                 OutlinedTextField(
-                    value = state.schoolCode,
-                    onValueChange = vm::onSchoolCode,
-                    label = { Text("School code") },
-                    supportingText = { Text("Provided by your admin") },
-                    singleLine = true,
+                    value = state.schoolCode, onValueChange = vm::onSchoolCode,
+                    label = { Text("School code") }, singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
                 )
-                Spacer(Modifier.height(12.dp))
+                Spacer(Modifier.height(10.dp))
                 OutlinedTextField(
-                    value = state.username,
-                    onValueChange = vm::onUsername,
-                    label = { Text("Username, email, or phone") },
-                    supportingText = { Text("Any identifier your admin set up") },
-                    singleLine = true,
+                    value = state.fullName, onValueChange = vm::onFullName,
+                    label = { Text("Full name") }, singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
                 )
-                Spacer(Modifier.height(12.dp))
+                Spacer(Modifier.height(10.dp))
                 OutlinedTextField(
-                    value = state.password,
-                    onValueChange = vm::onPassword,
-                    label = { Text("Password") },
-                    singleLine = true,
+                    value = state.email, onValueChange = vm::onEmail,
+                    label = { Text("Email (optional)") }, singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                Spacer(Modifier.height(10.dp))
+                OutlinedTextField(
+                    value = state.phone, onValueChange = vm::onPhone,
+                    label = { Text("Phone (optional)") }, singleLine = true,
+                    supportingText = { Text("Provide at least email or phone") },
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                Spacer(Modifier.height(10.dp))
+                OutlinedTextField(
+                    value = state.password, onValueChange = vm::onPassword,
+                    label = { Text("Password") }, singleLine = true,
+                    visualTransformation = PasswordVisualTransformation(),
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                Spacer(Modifier.height(10.dp))
+                OutlinedTextField(
+                    value = state.confirm, onValueChange = vm::onConfirm,
+                    label = { Text("Confirm password") }, singleLine = true,
                     visualTransformation = PasswordVisualTransformation(),
                     modifier = Modifier.fillMaxWidth(),
                 )
@@ -125,9 +126,7 @@ fun LoginScreen(
                 Button(
                     onClick = { vm.submit(onSuccess) },
                     enabled = !state.loading,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .heightIn(min = 48.dp),
+                    modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
                 ) {
                     if (state.loading) {
                         CircularProgressIndicator(
@@ -136,7 +135,7 @@ fun LoginScreen(
                             color = MaterialTheme.colorScheme.onPrimary,
                         )
                     } else {
-                        Text("Sign in", style = MaterialTheme.typography.labelLarge)
+                        Text("Create account", style = MaterialTheme.typography.labelLarge)
                     }
                 }
 
@@ -147,22 +146,14 @@ fun LoginScreen(
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Text(
-                        "First time here?",
+                        "Already registered?",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                     Spacer(Modifier.width(6.dp))
-                    TextButton(onClick = onSignUp) { Text("Create an account") }
+                    TextButton(onClick = onBackToLogin) { Text("Sign in") }
                 }
             }
         }
-
-        Spacer(Modifier.height(20.dp))
-        Text(
-            "© $year $BRAND_NAME. All rights reserved.",
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.align(Alignment.CenterHorizontally),
-        )
     }
 }

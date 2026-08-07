@@ -8,14 +8,15 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
-from app.core.errors import Unauthorized
+from app.core.errors import Conflict, NotFound, Unauthorized, Validation
 from app.core.security import (
     create_access_token,
+    hash_password,
     hash_refresh,
     new_refresh_token,
     verify_password,
 )
-from app.domain.schemas import LoginRequest, TokenPair
+from app.domain.schemas import LoginRequest, TeacherSignupRequest, TokenPair
 from app.infrastructure.db.models import RefreshToken, School, User, UserRole
 
 
@@ -52,6 +53,72 @@ class AuthService:
         pair = await self._issue_tokens(user, device_id, ip, ua)
         await self.s.commit()
         return pair
+
+    async def signup_teacher(
+        self, req: TeacherSignupRequest, ip: str | None, ua: str | None
+    ) -> tuple[User, TokenPair]:
+        if not req.email and not req.phone:
+            raise Validation("either email or phone is required")
+
+        school = (
+            await self.s.execute(select(School).where(School.code == req.school_code.strip()))
+        ).scalar_one_or_none()
+        if school is None or school.deleted_at is not None or not school.is_active:
+            raise NotFound("school code not recognised")
+
+        phone = _normalize_phone(req.phone) if req.phone else None
+        if req.phone and phone is None:
+            raise Validation("phone number is not valid")
+
+        # Uniqueness across all users, not just this school, so a phone/email
+        # can never be reused to hijack an admin identifier.
+        if req.email:
+            exists = (
+                await self.s.execute(select(User).where(User.email == req.email))
+            ).scalar_one_or_none()
+            if exists:
+                raise Conflict("email already registered")
+        if phone:
+            exists = (
+                await self.s.execute(select(User).where(User.phone == phone))
+            ).scalar_one_or_none()
+            if exists:
+                raise Conflict("phone already registered")
+
+        username = await self._suggest_username(req.full_name)
+        # Email is required by the model — synthesise a placeholder if the
+        # teacher signed up with just phone.
+        email = req.email or f"{username}@teachers.{school.code.lower()}.local"
+
+        user = User(
+            email=email,
+            username=username,
+            password_hash=hash_password(req.password),
+            full_name=req.full_name.strip(),
+            role=UserRole.teacher,
+            school_id=school.id,
+            phone=phone,
+            is_active=True,
+        )
+        self.s.add(user)
+        await self.s.flush()
+
+        pair = await self._issue_tokens(user, req.device_id, ip, ua)
+        await self.s.commit()
+        return user, pair
+
+    async def _suggest_username(self, full_name: str) -> str:
+        import re as _re
+        base = _re.sub(r"[^a-zA-Z0-9]+", ".", full_name.strip().lower()).strip(".")
+        base = base[:40] or "teacher"
+        for suffix in ("", *[str(n) for n in range(1, 1000)]):
+            candidate = f"{base}{suffix}"
+            clash = (
+                await self.s.execute(select(User).where(User.username == candidate))
+            ).scalar_one_or_none()
+            if clash is None:
+                return candidate
+        return f"{base}.{_re.sub(r'.', '', '').zfill(0)}"  # unreachable
 
     async def logout(self, raw_token: str) -> None:
         stmt = select(RefreshToken).where(RefreshToken.token_hash == hash_refresh(raw_token))
@@ -139,6 +206,21 @@ class AuthService:
             refresh_token=raw,
             expires_in=settings.access_token_ttl_seconds,
         )
+
+
+def _normalize_phone(raw: str | None, default_region: str = "IN") -> str | None:
+    """Same normalization AdminService / TeacherService use — E.164 with an
+    Indian default region so 10-digit inputs still parse."""
+    if not raw:
+        return None
+    try:
+        import phonenumbers
+        parsed = phonenumbers.parse(raw, default_region)
+        if not phonenumbers.is_valid_number(parsed):
+            return None
+        return phonenumbers.format_number(parsed, phonenumbers.PhoneNumberFormat.E164)
+    except Exception:
+        return None
 
 
 def _phone_candidates(raw: str) -> list[str]:

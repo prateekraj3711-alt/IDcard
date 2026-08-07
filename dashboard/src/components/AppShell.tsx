@@ -14,7 +14,7 @@ import DesignServicesIcon from '@mui/icons-material/DesignServices';
 import PrintIcon from '@mui/icons-material/Print';
 import LogoutIcon from '@mui/icons-material/Logout';
 import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useAuth } from '@/auth/store';
 import { BRAND_NAME } from '@/theme';
 
@@ -52,12 +52,32 @@ const nav = [
   },
 ];
 
+function buildGreeting(firstName: string): string {
+  const hour = new Date().getHours();
+  const timeOfDay =
+    hour < 5 ? 'Good night' :
+    hour < 12 ? 'Good morning' :
+    hour < 17 ? 'Good afternoon' :
+    hour < 21 ? 'Good evening' :
+    'Good night';
+
+  const KEY = 'lastSeen';
+  const now = Date.now();
+  const lastSeen = Number(localStorage.getItem(KEY) || 0);
+  const absentHours = lastSeen === 0 ? Infinity : (now - lastSeen) / 36e5;
+  localStorage.setItem(KEY, String(now));
+
+  if (absentHours >= 72) return `Welcome back, ${firstName} — ${timeOfDay}!`;
+  return `Hi, ${firstName}! ${timeOfDay}.`;
+}
+
 export function AppShell() {
   const loc = useLocation();
   const nav_ = useNavigate();
   const { user, clear } = useAuth();
   const [menuAnchor, setMenuAnchor] = useState<HTMLElement | null>(null);
   const firstName = (user?.full_name ?? '').split(' ')[0] || 'Admin';
+  const greeting = useMemo(() => buildGreeting(firstName), [firstName]);
 
   return (
     <Box sx={{ display: 'flex', minHeight: '100vh', bgcolor: 'background.default' }}>
@@ -135,7 +155,7 @@ export function AppShell() {
           <Toolbar sx={{ px: { xs: 2, md: 4 } }}>
             <Box sx={{ flexGrow: 1 }}>
               <Typography variant="h6" sx={{ lineHeight: 1.1 }}>
-                Welcome, {firstName}!
+                {greeting}
               </Typography>
               <Typography variant="caption" color="text.secondary">
                 {user?.role === 'super_admin' ? 'Super Admin' : 'Teacher'} · {user?.email}

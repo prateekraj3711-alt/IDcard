@@ -44,6 +44,16 @@ data class LoginResponseDto(
 data class RefreshRequestDto(val refresh_token: String, val device_id: String? = null)
 
 @Serializable
+data class TeacherSignupRequestDto(
+    val school_code: String,
+    val full_name: String,
+    val email: String? = null,
+    val phone: String? = null,
+    val password: String,
+    val device_id: String? = null,
+)
+
+@Serializable
 data class StudentDto(
     val id: String? = null,
     val client_uuid: String,
