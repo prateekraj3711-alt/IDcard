@@ -108,6 +108,7 @@ export interface TemplateBackgroundImage {
 export interface TemplateLayout {
   width: number;
   height: number;
+  dpi?: number;               // native DPI; renderer preserves this end-to-end
   background: string;
   background_image?: TemplateBackgroundImage;
   elements: TemplateElement[];

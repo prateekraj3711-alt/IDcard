@@ -73,6 +73,9 @@ export function TemplateEditorPage() {
   });
 
   const addFromCatalog = (entry: FieldCatalogEntry) => {
+    // Scale defaults to the template's native pixel size so a 500 DPI card
+    // gets big-enough elements to place, not a 24px sliver.
+    const scale = Math.max(1, layout.width / 340);
     setLayout((l) => ({
       ...l,
       elements: [
@@ -82,10 +85,11 @@ export function TemplateEditorPage() {
           kind: entry.kind,
           binding: entry.field,
           label: entry.label,
-          x: 20, y: 20,
-          width: entry.kind === 'text' ? 160 : 80,
-          height: entry.kind === 'text' ? 24 : 80,
-          fontSize: 14,
+          x: Math.round(20 * scale),
+          y: Math.round(20 * scale),
+          width: Math.round((entry.kind === 'text' ? 160 : 80) * scale),
+          height: Math.round((entry.kind === 'text' ? 24 : 80) * scale),
+          fontSize: Math.round(14 * scale),
           fontFamily: 'Inter',
           fill: '#111',
           align: 'left',
@@ -164,7 +168,7 @@ export function TemplateEditorPage() {
 
         <Card sx={{ flexGrow: 1 }}>
           <CardContent>
-            <Stack direction="row" spacing={2} alignItems="center" sx={{ mb: 2 }}>
+            <Stack direction="row" spacing={2} alignItems="center" sx={{ mb: 2 }} flexWrap="wrap">
               <TextField label="Template name" size="small" value={name} onChange={(e) => setName(e.target.value)} />
               <TextField
                 label="Width (px)" size="small" type="number" value={layout.width}
@@ -175,6 +179,10 @@ export function TemplateEditorPage() {
                 label="Height (px)" size="small" type="number" value={layout.height}
                 onChange={(e) => setLayout((l) => ({ ...l, height: Number(e.target.value) }))}
                 sx={{ width: 120 }}
+              />
+              <Chip
+                size="small" variant="outlined"
+                label={`${layout.dpi ?? 300} DPI · native ${layout.width}×${layout.height}px`}
               />
               {layout.background_image && (
                 <>
@@ -286,6 +294,14 @@ function CanvasEditor({
   const stageRef = useRef<Konva.Stage>(null);
   const trRef = useRef<Konva.Transformer>(null);
 
+  // Compute a display scale so a large native template (e.g. 1062×1687 at
+  // 500 DPI) fits inside the editor. Coordinates on element nodes remain in
+  // native pixels; Konva's stage scale handles the visual reduction only.
+  const MAX_DISPLAY_W = 640;
+  const MAX_DISPLAY_H = 720;
+  const scale = Math.min(1, MAX_DISPLAY_W / layout.width, MAX_DISPLAY_H / layout.height);
+  const PAD = 20;
+
   useEffect(() => {
     const tr = trRef.current; const stage = stageRef.current;
     if (!tr || !stage) return;
@@ -300,8 +316,12 @@ function CanvasEditor({
   return (
     <Paper variant="outlined" sx={{ display: 'inline-block', bgcolor: '#f0f2f5' }}>
       <Stage
-        width={layout.width + 40}
-        height={layout.height + 40}
+        width={Math.round(layout.width * scale) + PAD * 2}
+        height={Math.round(layout.height * scale) + PAD * 2}
+        scaleX={scale}
+        scaleY={scale}
+        offsetX={-PAD / scale}
+        offsetY={-PAD / scale}
         ref={stageRef}
         onMouseDown={(e) => {
           if (e.target === e.target.getStage()) onSelect(null);
@@ -309,17 +329,17 @@ function CanvasEditor({
       >
         <Layer>
           <Rect
-            x={20} y={20}
+            x={0} y={0}
             width={layout.width} height={layout.height}
-            fill={layout.background} stroke="#bbb" strokeWidth={1}
-            cornerRadius={6}
-            shadowColor="black" shadowBlur={6} shadowOpacity={0.08}
+            fill={layout.background} stroke="#bbb" strokeWidth={1 / scale}
+            cornerRadius={6 / scale}
+            shadowColor="black" shadowBlur={6 / scale} shadowOpacity={0.08}
           />
           {layout.background_image?.url && (
             <BackgroundImageNode
               url={layout.background_image.url}
               locked={layout.background_image.locked ?? true}
-              x={20} y={20}
+              x={0} y={0}
               width={layout.width}
               height={layout.height}
               onResize={(w, h) => onBgUpdate({ width: w, height: h })}
@@ -330,7 +350,7 @@ function CanvasEditor({
               key={el.id} el={el}
               onSelect={() => onSelect(el.id)}
               onChange={(p) => onUpdate(el.id, p)}
-              offsetX={20} offsetY={20}
+              offsetX={0} offsetY={0}
             />
           ))}
           <Transformer ref={trRef} rotateEnabled={false} borderStroke="#1F5DF9" anchorStroke="#1F5DF9" />

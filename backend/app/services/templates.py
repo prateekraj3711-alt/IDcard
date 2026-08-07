@@ -1,9 +1,11 @@
 from __future__ import annotations
 
+import io
 import json
 from typing import Any
 from uuid import UUID, uuid4
 
+from PIL import Image
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -115,20 +117,42 @@ class TemplateService:
         module: TemplateModule, name: str, school_id: UUID | None,
     ) -> IdCardTemplate:
         template_id = uuid4()
-        norm_ext = "jpg" if ext in {"jpg", "jpeg"} else "png"
+
+        # Preserve the source format so PNG stays PNG (no re-encode / no quality loss).
+        norm_ext = "png" if ext == "png" else ("jpg" if ext in {"jpg", "jpeg"} else ext)
+        content_type = f"image/{'jpeg' if norm_ext == 'jpg' else norm_ext}"
         key = f"templates/{template_id}/background.{norm_ext}"
+
+        # Inspect the image so we can keep the layout at native pixel resolution.
+        # A 500-DPI portrait CR80 comes in around 1062x1687 — we do NOT scale it
+        # down to a preview size; the editor scales for display and stores
+        # element coordinates in these native pixels so the final render is
+        # bit-for-bit at the source DPI.
+        try:
+            img = Image.open(io.BytesIO(body))
+            img.verify()
+            img = Image.open(io.BytesIO(body))     # verify() consumes the fp
+            width, height = img.size
+            dpi_x, dpi_y = img.info.get("dpi", (300, 300))
+            dpi = int(round(max(dpi_x, dpi_y)))
+        except Exception as exc:
+            raise Validation(f"cannot decode image: {exc}") from exc
+
         get_s3_client().put_object(
             Bucket=settings.s3_bucket_idcards,
             Key=key,
             Body=body,
-            ContentType=f"image/{'jpeg' if norm_ext == 'jpg' else 'png'}",
+            ContentType=content_type,
         )
 
-        # Canvas defaults tuned to CR80 aspect; user can adjust after import.
-        width, height = 340, 214
+        # Card dimensions in mm derived from pixel-count / DPI · 25.4.
+        card_w_mm = max(1, int(round(width / dpi * 25.4)))
+        card_h_mm = max(1, int(round(height / dpi * 25.4)))
+
         layout: dict[str, Any] = {
             "width": width,
             "height": height,
+            "dpi": dpi,
             "background": "#ffffff",
             "background_image": {"storage_key": key, "locked": True},
             "elements": [],
@@ -141,8 +165,8 @@ class TemplateService:
             name=name,
             layout_json=layout,
             paper_size="A4",
-            card_width_mm=86,
-            card_height_mm=54,
+            card_width_mm=card_w_mm,
+            card_height_mm=card_h_mm,
             created_by=user.id,
         )
         self.s.add(t)

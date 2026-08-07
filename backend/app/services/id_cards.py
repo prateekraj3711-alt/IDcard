@@ -1,29 +1,21 @@
 from __future__ import annotations
 
-import io
-import json
 from uuid import UUID
 
-import qrcode
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import CurrentUser, ensure_same_school
 from app.core.config import settings
 from app.core.errors import NotFound
-from app.infrastructure.db.models import IdCardTemplate, Photo, Student
+from app.infrastructure.db.models import IdCardTemplate, Photo, School, Student
 from app.infrastructure.storage import s3
-
-
-def _qr_png(payload: dict) -> bytes:
-    img = qrcode.make(json.dumps(payload, separators=(",", ":")))
-    buf = io.BytesIO()
-    img.save(buf, format="PNG")
-    return buf.getvalue()
+from app.services.rendering import render_card_png
 
 
 class IdCardService:
-    """Preview rasterizer. Bulk rendering lives in IdCardJobService + workers."""
+    """Preview rasterizer. Bulk rendering lives in IdCardJobService + workers.
+    Uses the shared native-DPI renderer so preview and generated cards match."""
 
     def __init__(self, session: AsyncSession):
         self.s = session
@@ -36,21 +28,43 @@ class IdCardService:
         template = await self.s.get(IdCardTemplate, template_id)
         if template is None:
             raise NotFound("template")
+        school = await self.s.get(School, student.school_id)
 
-        photo_url = None
+        # Fetch primary photo bytes if any.
+        photo_bytes: bytes | None = None
         photo = (
             await self.s.execute(
                 select(Photo).where(Photo.student_id == student.id, Photo.is_primary.is_(True))
             )
         ).scalar_one_or_none()
         if photo:
-            photo_url = s3.presign_get(settings.s3_bucket_photos, photo.storage_key)
+            try:
+                obj = s3.get_s3_client().get_object(Bucket=settings.s3_bucket_photos, Key=photo.storage_key)
+                photo_bytes = obj["Body"].read()
+            except Exception:
+                photo_bytes = None
 
-        # Scaffolded preview: return the QR PNG. Real preview would use the same
-        # rendering pipeline (Playwright) that the worker uses.
-        return _qr_png({
+        subject = {
+            "student.name": student.name,
+            "student.enrollment_no": student.enrollment_no,
+            "student.roll_no": student.roll_no or "",
+            "student.dob": student.dob.isoformat() if student.dob else "",
+            "student.blood_group": student.blood_group or "",
+            "student.father_name": student.father_name or "",
+            "student.mother_name": student.mother_name or "",
+            "student.address": student.address or "",
+            "student.mobile": student.mobile or "",
+            "school.name": school.name if school else "",
+        }
+        qr_payload = {
             "student_id": str(student.id),
             "enrollment_no": student.enrollment_no,
             "school_id": str(student.school_id),
-            "photo": photo_url,
-        })
+        }
+
+        return render_card_png(
+            template.layout_json or {},
+            subject,
+            photo_bytes=photo_bytes,
+            qr_payload=qr_payload,
+        )
