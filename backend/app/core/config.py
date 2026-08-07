@@ -43,6 +43,20 @@ class Settings(BaseSettings):
             return [o.strip() for o in v.split(",") if o.strip()]
         return v
 
+    @field_validator(
+        "s3_endpoint_url", "s3_region", "s3_bucket_photos", "s3_bucket_idcards",
+        "s3_access_key", "s3_secret_key", "redis_url",
+        mode="before",
+    )
+    @classmethod
+    def _strip_str(cls, v):
+        """Env vars pasted into Render's UI sometimes carry trailing spaces or
+        a stray CR — boto3 then rejects the endpoint URL as malformed. Strip
+        every S3-related string setting defensively."""
+        if isinstance(v, str):
+            return v.strip()
+        return v
+
     @field_validator("database_url", mode="before")
     @classmethod
     def _normalize_database_url(cls, v):
@@ -52,12 +66,11 @@ class Settings(BaseSettings):
         we install (asyncpg). Rewrite here so it always works."""
         if not isinstance(v, str) or not v:
             return v
-        # Prefix
+        v = v.strip()
         if v.startswith("postgres://"):
             v = "postgresql+asyncpg://" + v[len("postgres://"):]
         elif v.startswith("postgresql://") and "+" not in v.split("://", 1)[0]:
             v = "postgresql+asyncpg://" + v[len("postgresql://"):]
-        # Strip sslmode — asyncpg negotiates TLS on its own
         if "?" in v:
             base, _, query = v.partition("?")
             parts = [
