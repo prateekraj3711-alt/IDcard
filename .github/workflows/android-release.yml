@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
     inputs:
       api_base_url:
-        description: "Backend base URL (overrides the API_BASE_URL secret)"
+        description: "App API base URL (overrides the API_BASE_URL secret)"
         required: false
 
 # Grant the default token permission to publish releases + upload artifacts.
@@ -47,7 +47,7 @@ jobs:
         run: |
           URL="${{ github.event.inputs.api_base_url }}"
           if [ -z "$URL" ]; then URL="${{ secrets.API_BASE_URL }}"; fi
-          if [ -z "$URL" ]; then URL="https://idcard-api-ppti.onrender.com/api/v1/"; fi
+          if [ -z "$URL" ]; then URL="https://project--45371be8-44e2-463b-a814-0d4e05171128.lovable.app/api/public/v1/"; fi
           echo "url=$URL" >> "$GITHUB_OUTPUT"
           echo "Backend URL baked into APK: $URL"
 

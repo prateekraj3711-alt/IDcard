@@ -1,63 +1,29 @@
-# School Student Enrollment & ID Card Management System
+# Welcome to your Lovable project
 
-A production-grade platform for capturing student information from schools and generating ID cards at scale.
+This project was built with [Lovable](https://lovable.dev).
 
-## Components
+## Build with Lovable
 
-| Component | Stack | Path |
-|-----------|-------|------|
-| Android App (Teachers) | Kotlin, Jetpack Compose, MVVM, Room, Retrofit, CameraX, WorkManager, Hilt | `android/` |
-| Backend API | FastAPI, PostgreSQL, SQLAlchemy, Alembic, JWT, S3/R2 | `backend/` |
-| Admin Dashboard | React 18, TypeScript, Material UI 5, Vite, React Query | `dashboard/` |
+Open your project in the [Lovable editor](https://lovable.dev) and keep building.
 
-## Documentation
+- **Ship faster**: describe what you want to build and Lovable handles the code.
+- **Stay in sync**: connect the project to GitHub and every change made in Lovable is committed straight to your repository.
+- **Full ownership**: this code is yours. Push to your repository and your changes sync back into Lovable, ready for your next prompt.
 
-- **[Cloud Deploy — go live in 30 minutes](docs/CLOUD_DEPLOY.md)** ← click-through setup, no local infra
-- [Testing Guide (local web + Android)](docs/TESTING_GUIDE.md)
-- [Architecture Overview](docs/ARCHITECTURE.md)
-- [Database Schema (ER)](docs/DATABASE_SCHEMA.md)
-- [API Specification](docs/API_SPECIFICATION.md)
-- [Authentication Flow](docs/AUTH_FLOW.md)
-- [Offline Sync Strategy](docs/OFFLINE_SYNC.md)
-- [Image Upload Strategy](docs/IMAGE_UPLOAD.md)
-- [Bulk Import Pipeline](docs/BULK_IMPORT.md)
-- [ID Card Template Editor](docs/TEMPLATE_EDITOR.md)
-- [Security](docs/SECURITY.md)
-- [Deployment](docs/DEPLOYMENT.md)
-- [Future Enhancements](docs/FUTURE_ENHANCEMENTS.md)
+## Development
 
-## Quick Start (Local Dev)
+Prefer working locally? You need Node.js and npm — [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating).
 
-### Backend
-```bash
-cd backend
-cp .env.example .env
-docker compose up -d           # Postgres + MinIO (S3-compatible)
-pip install -r requirements.txt
-alembic upgrade head
-uvicorn app.main:app --reload  # http://localhost:8000
-```
-OpenAPI: http://localhost:8000/docs
-
-### Dashboard
-```bash
-cd dashboard
-npm install
-npm run dev                    # http://localhost:5173
+```sh
+git clone <this-repository-url>
+cd <repository-name>
+npm i
+npm run dev
 ```
 
-### Android
-Open `android/` in Android Studio (Iguana+), sync Gradle, run on device (API 24+).
+## Built with
 
-## Scale Targets
-
-- 1,000+ schools
-- 100,000+ students
-- Concurrent uploads with background sync
-- P95 search latency < 200 ms
-- Photo pipeline: capture → compress → sign → upload → CDN → ID card
-
-## Roles
-
-- **Super Admin** — full platform control: creates schools, creates teachers (with server-generated username + password returned once), can regenerate teacher passwords, manages templates, sees cross-school analytics.
-- **Teacher** — student CRUD + photo capture on their assigned school only. Signs in with school code + generated username + password.
+- TanStack Start
+- TypeScript
+- React
+- Tailwind CSS

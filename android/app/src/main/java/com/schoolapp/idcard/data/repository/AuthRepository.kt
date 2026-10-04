@@ -25,6 +25,7 @@ class AuthRepository @Inject constructor(
         schoolId = school?.id,
         schoolCode = school?.code,
         schoolName = school?.name,
+        entryFields = entry_fields,
     )
 
     suspend fun login(schoolCode: String, identifier: String, password: String, deviceId: String): UserDto {

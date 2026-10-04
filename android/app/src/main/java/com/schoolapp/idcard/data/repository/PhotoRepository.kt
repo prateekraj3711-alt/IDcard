@@ -31,7 +31,7 @@ class PhotoRepository @Inject constructor(
      *   1. Compress to 720x960 @ ~Q85 with EXIF-correct rotation (passport 3:4).
      *   2. Compute SHA-256 for content-addressed dedup.
      *   3. Insert PendingPhotoEntity + update the student's localPhotoPath.
-     *   4. Enqueue UploadPhotoWorker so it uploads to R2 as soon as the
+     *   4. Enqueue UploadPhotoWorker so it uploads to cloud storage as soon as the
      *      student has been synced up and the device is on a network.
      */
     suspend fun finalizeCapture(studentClientUuid: String, capturedJpeg: File): PendingPhotoEntity =

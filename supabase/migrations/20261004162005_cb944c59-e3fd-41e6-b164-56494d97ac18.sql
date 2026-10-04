@@ -1,0 +1,1 @@
+ALTER TABLE public.students ALTER COLUMN enrollment_no DROP NOT NULL;

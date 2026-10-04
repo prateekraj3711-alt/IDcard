@@ -26,7 +26,7 @@ app/src/main/java/com/schoolapp/idcard/
 
 - Room is source of truth. Every `saveDraft` upserts locally and enqueues a `PendingOp`.
 - `SyncStudentsWorker` drains pending ops with idempotency keys; server upserts by `client_uuid`.
-- `UploadPhotoWorker` handles presigned S3 PUT + complete.
+- `UploadPhotoWorker` uploads the compressed JPEG directly (multipart) to `POST students/{id}/photo`; no presigned URLs.
 
 ## Auth
 

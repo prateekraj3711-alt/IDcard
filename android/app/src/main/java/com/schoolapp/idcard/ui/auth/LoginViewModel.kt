@@ -37,16 +37,6 @@ class LoginViewModel @Inject constructor(
             _state.update { it.copy(error = "Enter your username/email/phone and password") }
             return
         }
-        // School code only mandatory when the identifier is a plain username.
-        // Email or phone lookups are global.
-        val id = s.username.trim()
-        val looksLikeEmail = "@" in id
-        val digits = id.replace(Regex("[^0-9+]"), "")
-        val looksLikePhone = !looksLikeEmail && (id.startsWith("+") || digits.length >= 7)
-        if (!looksLikeEmail && !looksLikePhone && s.schoolCode.isBlank()) {
-            _state.update { it.copy(error = "School code required for username sign-in") }
-            return
-        }
         _state.update { it.copy(loading = true) }
         viewModelScope.launch {
             try {

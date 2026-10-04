@@ -1,0 +1,17 @@
+# IDcard migration roadmap
+- [x] Audit repo (FastAPI + S3/R2 backend, React MUI dashboard, Kotlin Android)
+- [x] Cloud schema, RLS, storage buckets + policies
+- [x] Web dashboard ported (auth, schools, teachers, admins, students, photos, templates, generate, bulk import)
+- [x] Server code: account management, login by email/phone/username, first-admin bootstrap, teacher signup
+- [x] Android app updated (direct photo upload, no presigned URLs) + APK build workflow
+- [x] Web app works in any browser, phone menu, installable on Android
+- [x] Docs: docs/MIGRATION.md
+- [x] End-to-end test incl. cross-school isolation
+- [x] Auto-place data fields on imported card images (AI label detection)
+- [x] Editor: drag/resize any field + photo anywhere, any size/orientation; org template auto-fills those positions
+- [x] Candidate form: after save show "Add another" / "Done" (verified in browser as super admin)
+- [x] Hide Templates entry from non-super-admins (overview/dashboard + nav; /templates routes guarded, redirect to Candidates)
+- [x] User-role card preview watermark: now falls back to watermarked PDF when no PNG preview exists
+- [ ] Teacher-view browser verification (needs signing in as a user/teacher account — session mint was declined this session)
+- [x] Bulk import: all column mappings optional, no auto-generated values, unmatched columns skipped
+- [x] Make email optional when adding users (not everyone has email)

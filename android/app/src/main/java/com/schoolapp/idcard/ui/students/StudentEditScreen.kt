@@ -208,27 +208,46 @@ fun StudentEditScreen(
             Spacer(Modifier.height(8.dp))
             OutlinedTextField(state.name, vm::onName, label = { Text("Full name *") }, modifier = Modifier.fillMaxWidth())
             Spacer(Modifier.height(8.dp))
-            OutlinedTextField(state.enrollmentNo, vm::onEnrollment, label = { Text("Enrollment No *") }, modifier = Modifier.fillMaxWidth())
-            Spacer(Modifier.height(8.dp))
-            OutlinedTextField(state.rollNo ?: "", vm::onRollNo, label = { Text("Roll No") }, modifier = Modifier.fillMaxWidth())
-            Spacer(Modifier.height(8.dp))
-            OutlinedTextField(state.dob ?: "", vm::onDob, label = { Text("DOB (YYYY-MM-DD)") }, modifier = Modifier.fillMaxWidth())
-            Spacer(Modifier.height(8.dp))
-            OutlinedTextField(state.bloodGroup ?: "", vm::onBloodGroup, label = { Text("Blood Group") }, modifier = Modifier.fillMaxWidth())
+            if (state.ask("enrollment_no")) {
+                OutlinedTextField(state.enrollmentNo, vm::onEnrollment, label = { Text("Enrollment No *") }, modifier = Modifier.fillMaxWidth())
+                Spacer(Modifier.height(8.dp))
+            }
+            if (state.ask("roll_no")) {
+                OutlinedTextField(state.rollNo ?: "", vm::onRollNo, label = { Text("Roll No") }, modifier = Modifier.fillMaxWidth())
+                Spacer(Modifier.height(8.dp))
+            }
+            if (state.ask("dob")) {
+                OutlinedTextField(state.dob ?: "", vm::onDob, label = { Text("DOB (YYYY-MM-DD)") }, modifier = Modifier.fillMaxWidth())
+                Spacer(Modifier.height(8.dp))
+            }
+            if (state.ask("blood_group")) {
+                OutlinedTextField(state.bloodGroup ?: "", vm::onBloodGroup, label = { Text("Blood Group") }, modifier = Modifier.fillMaxWidth())
+                Spacer(Modifier.height(8.dp))
+            }
 
             Spacer(Modifier.height(16.dp))
             Text("Family", style = MaterialTheme.typography.titleSmall)
             Spacer(Modifier.height(8.dp))
-            OutlinedTextField(state.fatherName ?: "", vm::onFatherName, label = { Text("Father's Name") }, modifier = Modifier.fillMaxWidth())
-            Spacer(Modifier.height(8.dp))
-            OutlinedTextField(state.motherName ?: "", vm::onMotherName, label = { Text("Mother's Name") }, modifier = Modifier.fillMaxWidth())
+            if (state.ask("father_name")) {
+                OutlinedTextField(state.fatherName ?: "", vm::onFatherName, label = { Text("Father's Name") }, modifier = Modifier.fillMaxWidth())
+                Spacer(Modifier.height(8.dp))
+            }
+            if (state.ask("mother_name")) {
+                OutlinedTextField(state.motherName ?: "", vm::onMotherName, label = { Text("Mother's Name") }, modifier = Modifier.fillMaxWidth())
+                Spacer(Modifier.height(8.dp))
+            }
 
             Spacer(Modifier.height(16.dp))
             Text("Contact", style = MaterialTheme.typography.titleSmall)
             Spacer(Modifier.height(8.dp))
-            OutlinedTextField(state.mobile ?: "", vm::onMobile, label = { Text("Mobile") }, modifier = Modifier.fillMaxWidth())
-            Spacer(Modifier.height(8.dp))
-            OutlinedTextField(state.address ?: "", vm::onAddress, label = { Text("Address") }, modifier = Modifier.fillMaxWidth(), minLines = 2)
+            if (state.ask("mobile")) {
+                OutlinedTextField(state.mobile ?: "", vm::onMobile, label = { Text("Mobile") }, modifier = Modifier.fillMaxWidth())
+                Spacer(Modifier.height(8.dp))
+            }
+            if (state.ask("address")) {
+                OutlinedTextField(state.address ?: "", vm::onAddress, label = { Text("Address") }, modifier = Modifier.fillMaxWidth(), minLines = 2)
+                Spacer(Modifier.height(8.dp))
+            }
 
             state.error?.let {
                 Spacer(Modifier.height(12.dp))
