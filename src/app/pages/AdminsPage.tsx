@@ -154,7 +154,7 @@ function AddAdminDialog({
 }: {
   open: boolean;
   onClose: () => void;
-  onSubmit: (body: { full_name: string; email: string; phone?: string; username?: string; password?: string }) => void;
+  onSubmit: (body: { full_name: string; email?: string; phone?: string; username?: string; password?: string }) => void;
   submitting: boolean;
   error: Error | null;
 }) {
@@ -164,7 +164,7 @@ function AddAdminDialog({
   const [password, setPassword] = useState('');
 
   const submit = () => onSubmit({
-    full_name, email,
+    full_name, email: email || undefined,
     phone: phone || undefined,
     password: password || undefined,
   });
@@ -179,10 +179,9 @@ function AddAdminDialog({
           </Alert>
           <TextField label="Full name" value={full_name} onChange={(e) => setFullName(e.target.value)} required />
           <TextField
-            label="Email" type="email"
+            label="Email (optional)" type="email"
             value={email} onChange={(e) => setEmail(e.target.value)}
-            helperText="Primary login identifier"
-            required
+            helperText="Not needed — the admin can sign in with their user ID or phone"
           />
           <TextField
             label="Phone (optional)"
@@ -205,7 +204,7 @@ function AddAdminDialog({
       </DialogContent>
       <DialogActions>
         <Button onClick={onClose}>Cancel</Button>
-        <Button variant="contained" onClick={submit} disabled={submitting || !full_name || !email}>
+        <Button variant="contained" onClick={submit} disabled={submitting || !full_name}>
           {submitting ? 'Creating…' : 'Create'}
         </Button>
       </DialogActions>
