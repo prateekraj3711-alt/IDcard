@@ -14,7 +14,8 @@ import com.schoolapp.idcard.data.local.entity.SyncStatus
 import com.schoolapp.idcard.worker.SyncStudentsWorker
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.Flow
-import kotlinx.serialization.encodeToString
+import com.schoolapp.idcard.data.remote.dto.StudentDto
+import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.json.Json
 import java.util.UUID
 import javax.inject.Inject
@@ -32,8 +33,11 @@ class StudentRepository @Inject constructor(
     suspend fun getByUuid(uuid: String): StudentEntity? = studentDao.findByClientUuid(uuid)
 
     suspend fun saveDraft(entity: StudentEntity, submit: Boolean) {
+        // Keep a photo captured before the first save (the camera writes it separately).
+        val existing = studentDao.findByClientUuid(entity.clientUuid)
         val toSave = entity.copy(
-            status = if (submit) "submitted" else entity.status,
+            serverId = entity.serverId ?: existing?.serverId,
+            localPhotoPath = entity.localPhotoPath ?: existing?.localPhotoPath,
             syncStatus = SyncStatus.PENDING,
             updatedAt = System.currentTimeMillis(),
         )
@@ -43,7 +47,7 @@ class StudentRepository @Inject constructor(
                 entityType = "student",
                 entityUuid = toSave.clientUuid,
                 op = if (toSave.serverId == null) "create" else "update",
-                payloadJson = json.encodeToString(toSave.toDtoMap()),
+                payloadJson = json.encodeToString(StudentDto.serializer(), toSave.toDto(json)),
                 idempotencyKey = UUID.randomUUID().toString(),
             )
         )
@@ -59,21 +63,10 @@ class StudentRepository @Inject constructor(
     }
 }
 
-private fun StudentEntity.toDtoMap(): Map<String, String?> = mapOf(
-    "client_uuid" to clientUuid,
-    "school_id" to schoolId,
-    "class_id" to classId,
-    "section_id" to sectionId,
-    "enrollment_no" to enrollmentNo,
-    "roll_no" to rollNo,
-    "name" to name,
-    "father_name" to fatherName,
-    "mother_name" to motherName,
-    "dob" to dob,
-    "blood_group" to bloodGroup,
-    "gender" to gender,
-    "address" to address,
-    "mobile" to mobile,
-    "enrolled_on" to enrolledOn,
-    "status" to status,
+internal fun StudentEntity.toDto(json: Json): StudentDto = StudentDto(
+    client_uuid = clientUuid, school_id = schoolId, class_id = classId, section_id = sectionId,
+    enrollment_no = enrollmentNo.ifBlank { null }, roll_no = rollNo, name = name,
+    father_name = fatherName, mother_name = motherName, dob = dob, blood_group = bloodGroup,
+    gender = gender, address = address, mobile = mobile, enrolled_on = enrolledOn, status = status,
+    extra = extraJson?.let { runCatching { json.decodeFromString<Map<String, String>>(it) }.getOrNull() },
 )
