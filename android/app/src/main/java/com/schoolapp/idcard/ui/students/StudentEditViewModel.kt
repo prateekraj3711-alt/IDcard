@@ -13,6 +13,8 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import java.util.UUID
+import kotlinx.serialization.decodeFromString
+import kotlinx.serialization.encodeToString
 import javax.inject.Inject
 
 data class StudentEditUiState(
@@ -36,16 +38,30 @@ data class StudentEditUiState(
     val saving: Boolean = false,
     val savedOnce: Boolean = false,
     val askFields: List<String>? = null,
+    val gender: String? = null,
+    val extra: Map<String, String> = emptyMap(),
 ) {
+    /** extra.<key> details to show, same as the web form (standard ones when everything is asked). */
+    val extraKeys: List<String>
+        get() = if (askFields == null) STANDARD_EXTRAS.keys.toList()
+        else askFields.filter { it.startsWith("extra.") }.map { it.removePrefix("extra.") }
+
     /** Whether the super admin asked this user for [key]; null list = ask everything. */
     fun ask(key: String): Boolean = askFields == null || key in askFields
 }
+
+val STANDARD_EXTRAS = linkedMapOf(
+    "designation" to "Designation", "department" to "Department", "doj" to "Date of joining",
+    "valid_till" to "Valid till", "email" to "Email", "emergency_contact" to "Emergency contact",
+)
+fun extraLabel(k: String) = STANDARD_EXTRAS[k] ?: k.replace('_', ' ').replaceFirstChar { it.uppercase() }
 
 @HiltViewModel
 class StudentEditViewModel @Inject constructor(
     private val repo: StudentRepository,
     private val auth: AuthRepository,
     private val api: ApiService,
+    private val json: kotlinx.serialization.json.Json,
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(StudentEditUiState())
@@ -98,6 +114,8 @@ class StudentEditViewModel @Inject constructor(
                     bloodGroup = row.bloodGroup,
                     mobile = row.mobile,
                     address = row.address,
+                    gender = row.gender,
+                    extra = row.extraJson?.let { j -> runCatching { json.decodeFromString<Map<String, String>>(j) }.getOrNull() } ?: emptyMap(),
                     hasPhoto = row.localPhotoPath != null,
                     photoPath = row.localPhotoPath,
                 )
@@ -136,6 +154,8 @@ class StudentEditViewModel @Inject constructor(
     fun onBloodGroup(v: String) = _state.update { it.copy(bloodGroup = v) }
     fun onMobile(v: String) = _state.update { it.copy(mobile = v) }
     fun onAddress(v: String) = _state.update { it.copy(address = v) }
+    fun onGender(v: String?) = _state.update { it.copy(gender = v) }
+    fun onExtra(k: String, v: String) = _state.update { it.copy(extra = it.extra + (k to v)) }
 
     fun clearForm() {
         val kept = _state.value
@@ -155,7 +175,6 @@ class StudentEditViewModel @Inject constructor(
         val validation = when {
             s.schoolId.isBlank() -> "Pick a school for this candidate"
             s.name.isBlank() -> "Full name is required"
-            s.enrollmentNo.isBlank() && s.ask("enrollment_no") -> "Enrollment number is required"
             else -> null
         }
         if (validation != null) {
@@ -169,7 +188,7 @@ class StudentEditViewModel @Inject constructor(
                     StudentEntity(
                         clientUuid = s.clientUuid,
                         schoolId = s.schoolId,
-                        enrollmentNo = s.enrollmentNo.ifBlank { "C" + System.currentTimeMillis().toString(36).uppercase() },
+                        enrollmentNo = s.enrollmentNo.trim(),
                         name = s.name,
                         rollNo = s.rollNo,
                         fatherName = s.fatherName,
@@ -178,7 +197,11 @@ class StudentEditViewModel @Inject constructor(
                         bloodGroup = s.bloodGroup,
                         mobile = s.mobile,
                         address = s.address,
-                        status = if (submit) "submitted" else "draft",
+                        gender = s.gender,
+                        localPhotoPath = s.photoPath,
+                        extraJson = s.extra.mapValues { it.value.trim() }.filterValues { it.isNotEmpty() }
+                            .takeIf { it.isNotEmpty() }?.let { json.encodeToString(it) },
+                        status = "active",
                     ),
                     submit = submit,
                 )
