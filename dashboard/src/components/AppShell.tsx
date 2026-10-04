@@ -13,10 +13,11 @@ import UploadFileIcon from '@mui/icons-material/UploadFile';
 import DesignServicesIcon from '@mui/icons-material/DesignServices';
 import PrintIcon from '@mui/icons-material/Print';
 import LogoutIcon from '@mui/icons-material/Logout';
-import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom';
+import MenuIcon from '@mui/icons-material/Menu';
+import { Link, Outlet, useLocation, useNavigate } from '@/app/router-shim';
 import { useMemo, useState } from 'react';
-import { useAuth } from '@/auth/store';
-import { BRAND_NAME } from '@/theme';
+import { useAuth } from '@/app/auth/store';
+import { BRAND_NAME } from '@/app/theme';
 
 const DRAWER = 260;
 const nav = [
@@ -30,10 +31,10 @@ const nav = [
   {
     section: 'Data',
     items: [
-      { to: '/schools', label: 'Schools', icon: <SchoolIcon />, roles: ['super_admin'] as const },
-      { to: '/teachers', label: 'Teachers', icon: <PeopleIcon />, roles: ['super_admin'] as const },
+      { to: '/schools', label: 'Organizations', icon: <SchoolIcon />, roles: ['super_admin'] as const },
+      { to: '/teachers', label: 'Users', icon: <PeopleIcon />, roles: ['super_admin'] as const },
       { to: '/students', label: 'Candidates', icon: <BadgeIcon /> },
-      { to: '/bulk-import', label: 'Bulk Import', icon: <UploadFileIcon />, roles: ['super_admin'] as const },
+      { to: '/bulk-import', label: 'Bulk Generate', icon: <UploadFileIcon />, roles: ['super_admin'] as const },
     ],
   },
   {
@@ -75,21 +76,13 @@ export function AppShell() {
   const loc = useLocation();
   const nav_ = useNavigate();
   const { user, clear } = useAuth();
+  const [mobileOpen, setMobileOpen] = useState(false);
   const [menuAnchor, setMenuAnchor] = useState<HTMLElement | null>(null);
   const firstName = (user?.full_name ?? '').split(' ')[0] || 'Admin';
   const greeting = useMemo(() => buildGreeting(firstName), [firstName]);
 
-  return (
-    <Box sx={{ display: 'flex', minHeight: '100vh', bgcolor: 'background.default' }}>
-      {/* Sidebar */}
-      <Drawer
-        variant="permanent"
-        sx={{
-          width: DRAWER,
-          flexShrink: 0,
-          [`& .MuiDrawer-paper`]: { width: DRAWER, boxSizing: 'border-box' },
-        }}
-      >
+  const drawerContent = (
+      <>
         <Toolbar sx={{ px: 3 }}>
           <Stack direction="row" alignItems="center" spacing={1.5}>
             <Avatar
@@ -147,26 +140,54 @@ export function AppShell() {
             );
           })}
         </Box>
+      </>
+  );
+
+  return (
+    <Box sx={{ display: 'flex', minHeight: '100vh', bgcolor: 'background.default' }}>
+      {/* Sidebar */}
+      <Drawer
+        variant="temporary"
+        open={mobileOpen}
+        onClose={() => setMobileOpen(false)}
+        ModalProps={{ keepMounted: true }}
+        sx={{ display: { xs: 'block', md: 'none' }, [`& .MuiDrawer-paper`]: { width: DRAWER, boxSizing: 'border-box' } }}
+      >
+        <Box onClick={() => setMobileOpen(false)}>{drawerContent}</Box>
+      </Drawer>
+      <Drawer
+        variant="permanent"
+        sx={{
+          display: { xs: 'none', md: 'block' },
+          width: DRAWER,
+          flexShrink: 0,
+          [`& .MuiDrawer-paper`]: { width: DRAWER, boxSizing: 'border-box' },
+        }}
+      >
+        {drawerContent}
       </Drawer>
 
       {/* Main column */}
       <Box sx={{ flexGrow: 1, display: 'flex', flexDirection: 'column', minWidth: 0 }}>
         <AppBar position="sticky" elevation={0}>
-          <Toolbar sx={{ px: { xs: 2, md: 4 } }}>
-            <Box sx={{ flexGrow: 1 }}>
-              <Typography variant="h6" sx={{ lineHeight: 1.1 }}>
+          <Toolbar sx={{ px: { xs: 1, md: 4 } }}>
+            <IconButton aria-label="Open menu" onClick={() => setMobileOpen(true)} sx={{ display: { md: 'none' }, mr: 1 }}>
+              <MenuIcon />
+            </IconButton>
+            <Box sx={{ flexGrow: 1, minWidth: 0 }}>
+              <Typography variant="h6" noWrap sx={{ lineHeight: 1.1, fontSize: { xs: 16, md: 20 } }}>
                 {greeting}
               </Typography>
-              <Typography variant="caption" color="text.secondary">
-                {user?.role === 'super_admin' ? 'Super Admin' : 'Teacher'} · {user?.email}
+              <Typography variant="caption" color="text.secondary" noWrap component="div">
+                {user?.role === 'super_admin' ? 'Super Admin' : 'User'} · {user?.email}
               </Typography>
             </Box>
             <Chip
               size="small"
-              label={user?.role === 'super_admin' ? 'Super Admin' : 'Teacher'}
+              label={user?.role === 'super_admin' ? 'Super Admin' : 'User'}
               color="primary"
               variant="outlined"
-              sx={{ mr: 1 }}
+              sx={{ mr: 1, display: { xs: 'none', sm: 'inline-flex' } }}
             />
             <Tooltip title="Sign out">
               <IconButton onClick={(e) => setMenuAnchor(e.currentTarget)}>
