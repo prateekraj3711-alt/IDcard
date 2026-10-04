@@ -100,7 +100,7 @@ export const ClassesApi = {
 // ---------------------------------------------------------------- Accounts (server functions, service role server-side only)
 export const AdminsApi = {
   list: async () => (await listAccounts({ data: { role: 'super_admin' } })) as Admin[],
-  create: async (body: { full_name: string; email: string; phone?: string; username?: string; password?: string }) =>
+  create: async (body: { full_name: string; email?: string; phone?: string; username?: string; password?: string }) =>
     (await createAccount({ data: { ...body, role: 'super_admin' } })) as AdminCreated,
   regeneratePassword: async (id: string) =>
     (await regenerateAccountPassword({ data: { user_id: id } })) as PasswordResetResult,
@@ -114,8 +114,8 @@ export const TeachersApi = {
     school_id?: string; class_name?: string; full_name: string; email?: string; phone?: string; username?: string; password?: string;
   }) => (await createAccount({ data: { ...body, role: 'teacher' } })) as TeacherCreated,
   setClass: async (id: string, className: string) => { await setAccountClass({ data: { user_id: id, class_name: className } }); },
-  regeneratePassword: async (id: string) =>
-    (await regenerateAccountPassword({ data: { user_id: id } })) as PasswordResetResult,
+  regeneratePassword: async (id: string, password?: string) =>
+    (await regenerateAccountPassword({ data: { user_id: id, password: password || undefined } })) as PasswordResetResult,
   delete: async (id: string) => { await deleteAccount({ data: { user_id: id } }); },
 };
 
