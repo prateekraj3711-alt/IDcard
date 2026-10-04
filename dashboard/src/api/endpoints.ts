@@ -63,6 +63,10 @@ export const SchoolsApi = {
   delete: async (id: string) => {
     must(await supabase.from('schools').update({ deleted_at: new Date().toISOString(), is_active: false }).eq('id', id));
   },
+  deleteMany: async (ids: string[]) => {
+    if (!ids.length) return;
+    must(await supabase.from('schools').update({ deleted_at: new Date().toISOString(), is_active: false }).in('id', ids));
+  },
 };
 
 // ---------------------------------------------------------------- Classes / sections
@@ -188,6 +192,10 @@ export const StudentsApi = {
   },
   delete: async (id: string) => {
     must(await supabase.from('students').update({ deleted_at: new Date().toISOString(), status: 'archived' }).eq('id', id));
+  },
+  deleteMany: async (ids: string[]) => {
+    if (!ids.length) return;
+    must(await supabase.from('students').update({ deleted_at: new Date().toISOString(), status: 'archived' }).in('id', ids));
   },
   photoUrl: async (id: string) => (await StudentsApi.get(id)).primary_photo_url ?? null,
   uploadPhoto: async (
@@ -867,6 +875,78 @@ export const BulkImportsApi = {
     const mapping = body.column_mapping ?? (imp.column_mapping as Record<string, string>) ?? {};
     must(await supabase.from('bulk_imports').update({ status: 'importing', column_mapping: mapping }).eq('id', importId));
     const rows = must(await supabase.from('bulk_import_rows').select('*').eq('bulk_import_id', importId).order('row_index')) ?? [];
-    const photos = pendingImportPhotos.get(importId) ?? new Map<st
-
-... [truncated — file is 55536 bytes, showing first 51200]
+    const photos = pendingImportPhotos.get(importId) ?? new Map<string, Blob>();
+    let imported = 0, failed = 0, photosMatched = 0;
+    const studentIds: string[] = [];
+    for (let i = 0; i < rows.length; i++) {
+      const row = rows[i];
+      onProgress?.(i, rows.length);
+      if (row.status === 'imported') { imported++; if (row.student_id) studentIds.push(row.student_id); continue; }
+      try {
+        const { mapped, errors } = mapRow(row.raw as Record<string, unknown>, mapping);
+        if (errors.length) {
+          await supabase.from('bulk_import_rows').update({ status: 'invalid', mapped: mapped as never, errors: errors as never }).eq('id', row.id);
+          failed++;
+          continue;
+        }
+        let sid = row.student_id;
+        if (!sid) {
+          const insertPayload: Record<string, unknown> = {
+            school_id: imp.school_id,
+            name: mapped.name,
+            enrollment_no: mapped.enrollment_no,
+            roll_no: mapped.roll_no,
+            father_name: mapped.father_name,
+            dob: mapped.dob,
+            mobile: mapped.mobile,
+            address: mapped.address,
+            class_id: body.default_class_id || mapped.class_id,
+            section_id: body.default_section_id || mapped.section_id,
+            status: 'active',
+          };
+          const { data: st, error: stErr } = await supabase.from('students').insert(insertPayload as never).select('id').single();
+          if (stErr) throw stErr;
+          sid = st.id;
+        }
+        const hint = mapped.photo_hint || mapped.enrollment_no;
+        const photoBlob = hint ? (photos.get(normStem(String(hint))) ?? photos.get(normStem(String(hint).replace(/\.[a-z0-9]+$/i, '')))) : undefined;
+        let photoPath: string | undefined = undefined;
+        if (photoBlob) {
+          photoPath = await uploadStudentPhoto(imp.school_id, sid, photoBlob);
+          await supabase.from('students').update({ photo_path: photoPath } as never).eq('id', sid);
+          photosMatched++;
+        }
+        await supabase.from('bulk_import_rows').update({
+          status: 'imported',
+          student_id: sid,
+          mapped: mapped as never,
+          errors: [] as never,
+        }).eq('id', row.id);
+        imported++;
+        studentIds.push(sid);
+      } catch (err: unknown) {
+        failed++;
+        await supabase.from('bulk_import_rows').update({
+          status: 'failed',
+          errors: [err instanceof Error ? err.message : String(err)] as never,
+        }).eq('id', row.id);
+      }
+    }
+    pendingImportPhotos.delete(importId);
+    onProgress?.(rows.length, rows.length);
+    const stats = { total: rows.length, imported, failed, photos_matched: photosMatched };
+    await supabase.from('bulk_imports').update({ status: 'completed', stats }).eq('id', importId);
+    return { imported, failed, photos_matched: photosMatched, student_ids: studentIds };
+  },
+  rows: async (importId: string, params: { status_filter?: string; limit?: number; offset?: number }) => {
+    let qb = supabase.from('bulk_import_rows').select('*').eq('bulk_import_id', importId).order('row_index');
+    if (params.status_filter && params.status_filter !== 'all') {
+      qb = qb.eq('status', params.status_filter as never);
+    }
+    const from = params.offset ?? 0;
+    const to = from + (params.limit ?? 100) - 1;
+    const res = await qb.range(from, to);
+    if (res.error) throw res.error;
+    return (res.data ?? []) as unknown as BulkImportRow[];
+  },
+};

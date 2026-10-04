@@ -7,7 +7,7 @@ import {
 import AddIcon from '@mui/icons-material/Add';
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/DeleteOutline';
-import { DataGrid, GridColDef } from '@mui/x-data-grid';
+import { DataGrid, GridColDef, GridRowSelectionModel } from '@mui/x-data-grid';
 import { SchoolsApi, uploadSchoolBranding } from '@/app/api/endpoints';
 import { PHOTO_ACCEPT } from '@/app/media';
 import { friendlyError } from '@/app/media';
@@ -20,6 +20,8 @@ export function SchoolsPage() {
   const [q, setQ] = useState('');
   const [editing, setEditing] = useState<Partial<School> | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<School | null>(null);
+  const [selection, setSelection] = useState<GridRowSelectionModel>([]);
+  const [confirmBulk, setConfirmBulk] = useState(false);
 
   const { data, isLoading, error } = useQuery({
     queryKey: ['schools', q],
@@ -29,6 +31,10 @@ export function SchoolsPage() {
   const del = useMutation({
     mutationFn: (id: string) => SchoolsApi.delete(id),
     onSuccess: () => { qc.invalidateQueries({ queryKey: ['schools'] }); setConfirmDelete(null); },
+  });
+  const delMany = useMutation({
+    mutationFn: (ids: string[]) => SchoolsApi.deleteMany(ids),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['schools'] }); setSelection([]); setConfirmBulk(false); },
   });
 
   const columns: GridColDef<School>[] = [
@@ -57,9 +63,15 @@ export function SchoolsPage() {
           <Button variant="contained" startIcon={<AddIcon />} onClick={() => setEditing({ is_active: true })}>New organization</Button>
         )}
       </Stack>
+      {isAdmin && selection.length > 0 && (
+        <Alert severity="info" sx={{ mb: 2 }} action={
+          <Button color="error" size="small" startIcon={<DeleteIcon />} onClick={() => setConfirmBulk(true)}>Delete selected ({selection.length})</Button>
+        }>{selection.length} organizations selected.</Alert>
+      )}
       {error && <Alert severity="error" sx={{ mb: 2 }}>{friendlyError(error, "Couldn't load organizations")}</Alert>}
       <div style={{ height: 600, background: 'white' }}>
-        <DataGrid rows={data?.items ?? []} columns={columns} loading={isLoading} getRowId={(r) => r.id} disableRowSelectionOnClick />
+        <DataGrid rows={data?.items ?? []} columns={columns} loading={isLoading} getRowId={(r) => r.id} disableRowSelectionOnClick
+          checkboxSelection={isAdmin} rowSelectionModel={selection} onRowSelectionModelChange={(m) => setSelection(m)} />
       </div>
 
       {editing && <SchoolDialog school={editing} onClose={() => setEditing(null)} />}
@@ -67,13 +79,27 @@ export function SchoolsPage() {
       <Dialog open={!!confirmDelete} onClose={() => setConfirmDelete(null)}>
         <DialogTitle>Delete organization?</DialogTitle>
         <DialogContent>
-          <Typography>“{confirmDelete?.name}” will be deactivated and hidden. Its students and files are kept.</Typography>
+          <Typography>“{confirmDelete?.name}” will be deactivated and hidden. Its candidates and files are kept.</Typography>
           {del.isError && <Alert severity="error" sx={{ mt: 2 }}>{friendlyError(del.error)}</Alert>}
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setConfirmDelete(null)}>Cancel</Button>
           <Button color="error" variant="contained" disabled={del.isPending} onClick={() => del.mutate(confirmDelete!.id)}>
             {del.isPending ? 'Deleting…' : 'Delete'}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      <Dialog open={confirmBulk} onClose={() => setConfirmBulk(false)}>
+        <DialogTitle>Delete {selection.length} organizations?</DialogTitle>
+        <DialogContent>
+          <Typography>They will be deactivated and hidden. Their candidates and files are kept.</Typography>
+          {delMany.isError && <Alert severity="error" sx={{ mt: 2 }}>{friendlyError(delMany.error)}</Alert>}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setConfirmBulk(false)}>Cancel</Button>
+          <Button color="error" variant="contained" disabled={delMany.isPending} onClick={() => delMany.mutate(selection.map(String))}>
+            {delMany.isPending ? 'Deleting…' : 'Delete all'}
           </Button>
         </DialogActions>
       </Dialog>
