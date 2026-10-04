@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
     inputs:
       api_base_url:
-        description: "App API base URL (overrides the API_BASE_URL secret)"
+        description: "App API base URL (optional override)"
         required: false
 
 # Grant the default token permission to publish releases + upload artifacts.
