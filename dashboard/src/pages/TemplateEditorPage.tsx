@@ -2,13 +2,15 @@ import { useEffect, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
-  Box, Button, Card, CardContent, Chip, Divider, FormControlLabel, IconButton, MenuItem, Paper,
+  Box, Button, Card, CardContent, Chip, Dialog, DialogActions, DialogContent, DialogTitle, Divider, FormControlLabel, IconButton, MenuItem, Paper,
   Stack, Switch, TextField, ToggleButton, ToggleButtonGroup, Tooltip, Typography,
 } from '@mui/material';
 import DeleteIcon from '@mui/icons-material/Delete';
 import SaveIcon from '@mui/icons-material/Save';
 import LockIcon from '@mui/icons-material/Lock';
 import LockOpenIcon from '@mui/icons-material/LockOpen';
+import VisibilityIcon from '@mui/icons-material/Visibility';
+import { renderCardCanvas } from '@/localRender';
 import { Stage, Layer, Rect, Text as KText, Image as KImage, Transformer } from 'react-konva';
 import useImage from 'use-image';
 import Konva from 'konva';
@@ -61,12 +63,12 @@ export function TemplateEditorPage() {
         background_image: layout.background_image
           ? { storage_key: layout.background_image.storage_key, locked: layout.background_image.locked ?? true }
           : undefined,
-        elements: layout.elements.map(({ url: _u, ...e }) => e),
+        elements: layout.elements.map(({ url: _u, ...e }: any) => e),
       };
       const body: Partial<Template> = { name, module, layout_json: clean };
       return isNew ? TemplatesApi.create(body) : TemplatesApi.update(id!, body);
     },
-    onSuccess: (t) => {
+    onSuccess: (t: any) => {
       qc.invalidateQueries({ queryKey: ['templates'] });
       nav(`/templates/${t.id}`, { replace: true });
     },
@@ -76,7 +78,7 @@ export function TemplateEditorPage() {
     // Scale defaults to the template's native pixel size so a 500 DPI card
     // gets big-enough elements to place, not a 24px sliver.
     const scale = Math.max(1, layout.width / 340);
-    setLayout((l) => ({
+    setLayout((l: any) => ({
       ...l,
       elements: [
         ...l.elements,
@@ -93,20 +95,21 @@ export function TemplateEditorPage() {
           fontFamily: 'Inter',
           fill: '#111',
           align: 'left',
+          ...(entry.kind === 'text' ? { prefix: `${entry.label}:`, wrap: true, lineHeight: 1.2 } : {}),
         },
       ],
     }));
   };
 
   const updateElement = (elId: string, patch: Partial<TemplateElement>) => {
-    setLayout((l) => ({
+    setLayout((l: any) => ({
       ...l,
-      elements: l.elements.map((e) => (e.id === elId ? { ...e, ...patch } : e)),
+      elements: l.elements.map((e: any) => (e.id === elId ? { ...e, ...patch } : e)),
     }));
   };
 
   const removeElement = (elId: string) => {
-    setLayout((l) => ({ ...l, elements: l.elements.filter((e) => e.id !== elId) }));
+    setLayout((l: any) => ({ ...l, elements: l.elements.filter((e: any) => e.id !== elId) }));
     setSelectedId(null);
   };
 
@@ -117,10 +120,26 @@ export function TemplateEditorPage() {
   };
 
   const removeBackground = () => {
-    setLayout((l) => ({ ...l, background_image: undefined }));
+    setLayout((l: any) => ({ ...l, background_image: undefined }));
   };
 
   const selectedEl = layout.elements.find((e) => e.id === selectedId) ?? null;
+  const [previewOpen, setPreviewOpen] = useState(false);
+  const [previewError, setPreviewError] = useState<string | null>(null);
+  const previewBox = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    if (!previewOpen) return;
+    let live = true;
+    setPreviewError(null);
+    const bindings: Record<string, string> = {};
+    for (const el of layout.elements) if (el.binding) bindings[el.binding] = SAMPLE[el.binding.split('.').pop()!] ?? 'Sample value for this field';
+    renderCardCanvas(layout, { bindings }, { scale: Math.min(4, 700 / layout.width) }).then((c) => {
+      if (!live || !previewBox.current) return;
+      c.style.maxWidth = '100%'; c.style.height = 'auto'; c.style.boxShadow = '0 2px 12px rgba(0,0,0,.2)';
+      previewBox.current.replaceChildren(c);
+    }).catch((e) => live && setPreviewError((e as Error).message));
+    return () => { live = false; };
+  }, [previewOpen, layout]);
 
   return (
     <Box>
@@ -135,6 +154,9 @@ export function TemplateEditorPage() {
           <ToggleButton value="student">Student</ToggleButton>
           <ToggleButton value="employee">Employee</ToggleButton>
         </ToggleButtonGroup>
+        <Button variant="outlined" startIcon={<VisibilityIcon />} onClick={() => setPreviewOpen(true)}>
+          Preview with long text
+        </Button>
         <Button
           variant="contained" startIcon={<SaveIcon />}
           disabled={!name || save.isPending}
@@ -172,17 +194,17 @@ export function TemplateEditorPage() {
               <TextField label="Template name" size="small" value={name} onChange={(e) => setName(e.target.value)} />
               <TextField
                 label="Width (px)" size="small" type="number" value={layout.width}
-                onChange={(e) => setLayout((l) => ({ ...l, width: Number(e.target.value) }))}
+                onChange={(e) => setLayout((l: any) => ({ ...l, width: Number(e.target.value) }))}
                 sx={{ width: 120 }}
               />
               <TextField
                 label="Height (px)" size="small" type="number" value={layout.height}
-                onChange={(e) => setLayout((l) => ({ ...l, height: Number(e.target.value) }))}
+                onChange={(e) => setLayout((l: any) => ({ ...l, height: Number(e.target.value) }))}
                 sx={{ width: 120 }}
               />
               <TextField
                 select label="DPI" size="small" value={layout.dpi ?? 300}
-                onChange={(e) => setLayout((l) => ({ ...l, dpi: Number(e.target.value) }))}
+                onChange={(e) => setLayout((l: any) => ({ ...l, dpi: Number(e.target.value) }))}
                 sx={{ width: 100 }}
               >
                 {[72, 96, 150, 200, 300, 400, 500, 600].map((d) => (
@@ -233,6 +255,29 @@ export function TemplateEditorPage() {
                 />
                 {selectedEl.kind === 'text' && (
                   <>
+                    <TextField
+                      label="Label before value" size="small" value={selectedEl.prefix ?? ''}
+                      placeholder="e.g. Name:" helperText="Printed before the data, e.g. “Name: Prateek Raj”"
+                      onChange={(e) => updateElement(selectedEl.id, { prefix: e.target.value })}
+                    />
+                    <FormControlLabel
+                      control={<Switch checked={selectedEl.wrap !== false}
+                        onChange={(e) => updateElement(selectedEl.id, { wrap: e.target.checked })} />}
+                      label="Wrap long text to new lines"
+                    />
+                    <Stack direction="row" spacing={1}>
+                      <TextField label="Line spacing" size="small" type="number" inputProps={{ step: 0.1, min: 0.8, max: 3 }}
+                        value={selectedEl.lineHeight ?? 1.2}
+                        onChange={(e) => updateElement(selectedEl.id, { lineHeight: Number(e.target.value) || 1.2 })} />
+                      <TextField label="Max lines" size="small" type="number" inputProps={{ min: 0 }}
+                        value={selectedEl.maxLines ?? ''}
+                        onChange={(e) => updateElement(selectedEl.id, { maxLines: Number(e.target.value) || undefined })} />
+                    </Stack>
+                    <FormControlLabel
+                      control={<Switch checked={selectedEl.fontWeight === 'bold'}
+                        onChange={(e) => updateElement(selectedEl.id, { fontWeight: e.target.checked ? 'bold' : 'normal' })} />}
+                      label="Bold"
+                    />
                     <TextField
                       label="Font size" size="small" type="number" value={selectedEl.fontSize ?? 14}
                       onChange={(e) => updateElement(selectedEl.id, { fontSize: Number(e.target.value) })}
@@ -287,9 +332,30 @@ export function TemplateEditorPage() {
           </CardContent>
         </Card>
       </Stack>
+
+      <Dialog open={previewOpen} onClose={() => setPreviewOpen(false)} maxWidth="md" fullWidth>
+        <DialogTitle>Preview with sample data</DialogTitle>
+        <DialogContent>
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+            Long values wrap onto new lines and push the fields below them down, exactly as on printed cards.
+          </Typography>
+          <Box ref={previewBox} sx={{ display: 'flex', justifyContent: 'center' }} />
+          {previewError && <Typography color="error">{previewError}</Typography>}
+        </DialogContent>
+        <DialogActions><Button onClick={() => setPreviewOpen(false)}>Close</Button></DialogActions>
+      </Dialog>
     </Box>
   );
 }
+
+const SAMPLE: Record<string, string> = {
+  name: 'Prateek Raj Kumar Singh Chauhan', enrollment_no: 'EMP-2026-00421', employee_id: 'EMP-2026-00421',
+  dob: '1994-07-15', age: '32', blood_group: 'B+', gender: 'male', mobile: '+919876543210',
+  address: 'Flat 12B, Sunrise Apartments, MG Road, Indiranagar, Bengaluru, Karnataka 560038',
+  father_name: 'Rajendra Kumar Singh', mother_name: 'Sunita Devi', designation: 'Senior Operations Manager',
+  department: 'Logistics & Supply Chain', doj: '2021-04-01', class_section: 'X - A', roll_no: '17',
+  email: 'prateek.raj@example.com', valid_till: '2027-03-31', emergency_contact: '+919812345678',
+};
 
 function CanvasEditor({
   layout, selectedId, onSelect, onUpdate, onBgUpdate,
@@ -354,7 +420,7 @@ function CanvasEditor({
               onResize={(w, h) => onBgUpdate({ width: w, height: h })}
             />
           )}
-          {layout.elements.map((el) => (
+          {layout.elements.map((el: any) => (
             <ElementNode
               key={el.id} el={el}
               onSelect={() => onSelect(el.id)}
@@ -372,7 +438,7 @@ function CanvasEditor({
 function BackgroundImageNode({
   url, locked, x, y, width, height, onResize,
 }: { url: string; locked: boolean; x: number; y: number; width: number; height: number; onResize: (w: number, h: number) => void }) {
-  // Do NOT request the image as CORS-anonymous — R2's default responses have
+  // Do NOT request the image as CORS-anonymous — some storage responses have
   // no Access-Control-Allow-Origin header, which makes anonymous fetches
   // fail. The canvas will be "tainted" (we can't read pixels back), which
   // is fine because the editor never calls toDataURL on it.
@@ -430,9 +496,12 @@ function ElementNode({
     return (
       <KText
         {...common}
-        text={el.text ?? el.label ?? el.binding ?? ''}
+        text={el.text ?? `${el.prefix ? `${el.prefix} ` : ''}${el.prefix ? (el.binding ?? '') : (el.label ?? el.binding ?? '')}`}
         width={el.width}
         height={el.height}
+        wrap={el.wrap === false ? 'none' : 'word'}
+        lineHeight={el.lineHeight ?? 1.2}
+        fontStyle={el.fontWeight === 'bold' ? 'bold' : 'normal'}
         fontSize={el.fontSize ?? 14}
         fontFamily={el.fontFamily ?? 'Inter'}
         fill={el.fill ?? '#111'}
