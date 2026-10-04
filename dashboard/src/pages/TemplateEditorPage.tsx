@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useParams, useNavigate } from '@/app/router-shim';
+import { useParams, useNavigate } from 'react-router-dom';
 import {
   Box, Button, Card, CardContent, Chip, Dialog, DialogActions, DialogContent, DialogTitle, Divider, FormControlLabel, IconButton, MenuItem, Paper,
   Stack, Switch, TextField, ToggleButton, ToggleButtonGroup, Tooltip, Typography,
@@ -10,12 +10,12 @@ import SaveIcon from '@mui/icons-material/Save';
 import LockIcon from '@mui/icons-material/Lock';
 import LockOpenIcon from '@mui/icons-material/LockOpen';
 import VisibilityIcon from '@mui/icons-material/Visibility';
-import { renderCardCanvas } from '@/app/localRender';
+import { renderCardCanvas } from '@/localRender';
 import { Stage, Layer, Rect, Text as KText, Image as KImage, Transformer } from 'react-konva';
 import useImage from 'use-image';
 import Konva from 'konva';
-import { TemplatesApi } from '@/app/api/endpoints';
-import type { FieldCatalogEntry, Template, TemplateElement, TemplateLayout, TemplateModule } from '@/app/types';
+import { TemplatesApi } from '@/api/endpoints';
+import type { FieldCatalogEntry, Template, TemplateElement, TemplateLayout, TemplateModule } from '@/types';
 
 const DEFAULT_CARD_W = 340;
 const DEFAULT_CARD_H = 214;
@@ -63,12 +63,12 @@ export function TemplateEditorPage() {
         background_image: layout.background_image
           ? { storage_key: layout.background_image.storage_key, locked: layout.background_image.locked ?? true }
           : undefined,
-        elements: layout.elements.map(({ url: _u, ...e }) => e),
+        elements: layout.elements.map(({ url: _u, ...e }: any) => e),
       };
       const body: Partial<Template> = { name, module, layout_json: clean };
       return isNew ? TemplatesApi.create(body) : TemplatesApi.update(id!, body);
     },
-    onSuccess: (t) => {
+    onSuccess: (t: any) => {
       qc.invalidateQueries({ queryKey: ['templates'] });
       nav(`/templates/${t.id}`, { replace: true });
     },
@@ -78,7 +78,7 @@ export function TemplateEditorPage() {
     // Scale defaults to the template's native pixel size so a 500 DPI card
     // gets big-enough elements to place, not a 24px sliver.
     const scale = Math.max(1, layout.width / 340);
-    setLayout((l) => ({
+    setLayout((l: any) => ({
       ...l,
       elements: [
         ...l.elements,
@@ -102,14 +102,14 @@ export function TemplateEditorPage() {
   };
 
   const updateElement = (elId: string, patch: Partial<TemplateElement>) => {
-    setLayout((l) => ({
+    setLayout((l: any) => ({
       ...l,
-      elements: l.elements.map((e) => (e.id === elId ? { ...e, ...patch } : e)),
+      elements: l.elements.map((e: any) => (e.id === elId ? { ...e, ...patch } : e)),
     }));
   };
 
   const removeElement = (elId: string) => {
-    setLayout((l) => ({ ...l, elements: l.elements.filter((e) => e.id !== elId) }));
+    setLayout((l: any) => ({ ...l, elements: l.elements.filter((e: any) => e.id !== elId) }));
     setSelectedId(null);
   };
 
@@ -120,7 +120,7 @@ export function TemplateEditorPage() {
   };
 
   const removeBackground = () => {
-    setLayout((l) => ({ ...l, background_image: undefined }));
+    setLayout((l: any) => ({ ...l, background_image: undefined }));
   };
 
   const selectedEl = layout.elements.find((e) => e.id === selectedId) ?? null;
@@ -194,17 +194,17 @@ export function TemplateEditorPage() {
               <TextField label="Template name" size="small" value={name} onChange={(e) => setName(e.target.value)} />
               <TextField
                 label="Width (px)" size="small" type="number" value={layout.width}
-                onChange={(e) => setLayout((l) => ({ ...l, width: Number(e.target.value) }))}
+                onChange={(e) => setLayout((l: any) => ({ ...l, width: Number(e.target.value) }))}
                 sx={{ width: 120 }}
               />
               <TextField
                 label="Height (px)" size="small" type="number" value={layout.height}
-                onChange={(e) => setLayout((l) => ({ ...l, height: Number(e.target.value) }))}
+                onChange={(e) => setLayout((l: any) => ({ ...l, height: Number(e.target.value) }))}
                 sx={{ width: 120 }}
               />
               <TextField
                 select label="DPI" size="small" value={layout.dpi ?? 300}
-                onChange={(e) => setLayout((l) => ({ ...l, dpi: Number(e.target.value) }))}
+                onChange={(e) => setLayout((l: any) => ({ ...l, dpi: Number(e.target.value) }))}
                 sx={{ width: 100 }}
               >
                 {[72, 96, 150, 200, 300, 400, 500, 600].map((d) => (
@@ -420,7 +420,7 @@ function CanvasEditor({
               onResize={(w, h) => onBgUpdate({ width: w, height: h })}
             />
           )}
-          {layout.elements.map((el) => (
+          {layout.elements.map((el: any) => (
             <ElementNode
               key={el.id} el={el}
               onSelect={() => onSelect(el.id)}

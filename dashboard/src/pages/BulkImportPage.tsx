@@ -1,4 +1,4 @@
-import { friendlyError } from '@/app/media';
+import { friendlyError } from '@/media';
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
@@ -12,9 +12,9 @@ import FolderZipIcon from '@mui/icons-material/FolderZip';
 import PhotoLibraryIcon from '@mui/icons-material/PhotoLibrary';
 import PrintIcon from '@mui/icons-material/Print';
 import AddIcon from '@mui/icons-material/Add';
-import { SchoolsApi, BulkImportsApi, TemplatesApi } from '@/app/api/endpoints';
-import { useNavigate } from '@/app/router-shim';
-import type { BulkImportPreview, BulkImportCommitResult, School, Template } from '@/app/types';
+import { SchoolsApi, BulkImportsApi, TemplatesApi } from '@/api/endpoints';
+import { useNavigate } from 'react-router-dom';
+import type { BulkImportPreview, BulkImportCommitResult, School, Template } from '@/types';
 
 /** Candidate fields a data column can fill. `extra:*` are free-form details printed by templates. */
 const FIELD_OPTIONS: Array<[string, string]> = [
@@ -237,7 +237,7 @@ export function BulkImportPage() {
                   </TableRow>
                 </TableHead>
                 <TableBody>
-                  {preview.columns_detected.map((col) => (
+                  {preview.columns_detected.map((col: string) => (
                     <TableRow key={col}>
                       <TableCell><strong>{col}</strong></TableCell>
                       <TableCell sx={{ maxWidth: 260, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
