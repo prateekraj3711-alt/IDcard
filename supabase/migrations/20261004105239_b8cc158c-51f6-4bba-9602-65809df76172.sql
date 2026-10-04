@@ -1,0 +1,10 @@
+REVOKE EXECUTE ON FUNCTION public.has_role(uuid, public.app_role) FROM PUBLIC, anon;
+REVOKE EXECUTE ON FUNCTION public.current_school_id() FROM PUBLIC, anon;
+REVOKE EXECUTE ON FUNCTION public.can_access_school(uuid) FROM PUBLIC, anon;
+REVOKE EXECUTE ON FUNCTION public.can_access_school_path(text) FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.has_role(uuid, public.app_role) TO authenticated, service_role;
+GRANT EXECUTE ON FUNCTION public.current_school_id() TO authenticated, service_role;
+GRANT EXECUTE ON FUNCTION public.can_access_school(uuid) TO authenticated, service_role;
+GRANT EXECUTE ON FUNCTION public.can_access_school_path(text) TO authenticated, service_role;
+REVOKE EXECUTE ON FUNCTION public.record_student_photo(uuid, text, int, int, int, text, text) FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.record_student_photo(uuid, text, int, int, int, text, text) TO authenticated;

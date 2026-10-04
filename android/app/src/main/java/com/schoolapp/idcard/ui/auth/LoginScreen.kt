@@ -83,21 +83,12 @@ fun LoginScreen(
                 )
                 Spacer(Modifier.height(4.dp))
                 Text(
-                    "Sign in to add candidates for your school.",
+                    "Sign in to add candidates.",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
                 Spacer(Modifier.height(24.dp))
 
-                OutlinedTextField(
-                    value = state.schoolCode,
-                    onValueChange = vm::onSchoolCode,
-                    label = { Text("School code (optional)") },
-                    supportingText = { Text("Only required if you sign in with a username") },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth(),
-                )
-                Spacer(Modifier.height(12.dp))
                 OutlinedTextField(
                     value = state.username,
                     onValueChange = vm::onUsername,

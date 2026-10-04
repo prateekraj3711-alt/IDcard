@@ -22,6 +22,7 @@ data class UserDto(
     val email: String,
     val role: String,
     val school: SchoolMiniDto? = null,
+    val entry_fields: List<String>? = null,
 )
 
 @Serializable
@@ -76,27 +77,14 @@ data class StudentDto(
 )
 
 @Serializable
-data class PhotoUploadRequestDto(
+data class PhotoUploadResultDto(
+    val photo_id: String? = null,
+    val photo_path: String,
     val sha256: String,
-    val size_bytes: Long,
-    val content_type: String = "image/jpeg",
-)
-
-@Serializable
-data class PhotoUploadUrlDto(
-    val url: String,
-    val storage_key: String,
-    val expires_in: Int,
-    val required_headers: Map<String, String>,
-)
-
-@Serializable
-data class PhotoCompleteDto(
-    val storage_key: String,
-    val sha256: String,
-    val size_bytes: Long,
+    val size_bytes: Long? = null,
     val width: Int? = null,
     val height: Int? = null,
+    val duplicate: Boolean = false,
 )
 
 @Serializable

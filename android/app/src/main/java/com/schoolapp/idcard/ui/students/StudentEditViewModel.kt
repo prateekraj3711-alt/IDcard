@@ -35,7 +35,11 @@ data class StudentEditUiState(
     val error: String? = null,
     val saving: Boolean = false,
     val savedOnce: Boolean = false,
-)
+    val askFields: List<String>? = null,
+) {
+    /** Whether the super admin asked this user for [key]; null list = ask everything. */
+    fun ask(key: String): Boolean = askFields == null || key in askFields
+}
 
 @HiltViewModel
 class StudentEditViewModel @Inject constructor(
@@ -61,6 +65,7 @@ class StudentEditViewModel @Inject constructor(
                 schoolId = pinnedSchoolId ?: "",
                 schoolLabel = pinnedLabel,
                 schoolPickerRequired = pinnedSchoolId == null,
+                askFields = session?.entryFields,
             )
         }
         if (pinnedSchoolId == null) {
@@ -139,6 +144,7 @@ class StudentEditViewModel @Inject constructor(
             schoolLabel = kept.schoolLabel,
             schools = kept.schools,
             schoolPickerRequired = kept.schoolPickerRequired,
+            askFields = kept.askFields,
         )
     }
 
@@ -149,7 +155,7 @@ class StudentEditViewModel @Inject constructor(
         val validation = when {
             s.schoolId.isBlank() -> "Pick a school for this candidate"
             s.name.isBlank() -> "Full name is required"
-            s.enrollmentNo.isBlank() -> "Enrollment number is required"
+            s.enrollmentNo.isBlank() && s.ask("enrollment_no") -> "Enrollment number is required"
             else -> null
         }
         if (validation != null) {
@@ -163,7 +169,7 @@ class StudentEditViewModel @Inject constructor(
                     StudentEntity(
                         clientUuid = s.clientUuid,
                         schoolId = s.schoolId,
-                        enrollmentNo = s.enrollmentNo,
+                        enrollmentNo = s.enrollmentNo.ifBlank { "C" + System.currentTimeMillis().toString(36).uppercase() },
                         name = s.name,
                         rollNo = s.rollNo,
                         fatherName = s.fatherName,

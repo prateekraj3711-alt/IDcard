@@ -20,6 +20,8 @@ data class SessionInfo(
     val schoolId: String?,
     val schoolCode: String?,
     val schoolName: String?,
+    /** Candidate details the super admin asks this user for; null = ask everything. */
+    val entryFields: List<String>? = null,
 )
 
 @Singleton
@@ -59,6 +61,7 @@ class TokenStore @Inject constructor(context: Context) {
             .putString(KEY_SCHOOL_ID, info.schoolId)
             .putString(KEY_SCHOOL_CODE, info.schoolCode)
             .putString(KEY_SCHOOL_NAME, info.schoolName)
+            .putString(KEY_ENTRY_FIELDS, info.entryFields?.joinToString("\n"))
             .apply()
     }
 
@@ -72,6 +75,7 @@ class TokenStore @Inject constructor(context: Context) {
             schoolId = prefs.getString(KEY_SCHOOL_ID, null),
             schoolCode = prefs.getString(KEY_SCHOOL_CODE, null),
             schoolName = prefs.getString(KEY_SCHOOL_NAME, null),
+            entryFields = prefs.getString(KEY_ENTRY_FIELDS, null)?.split("\n")?.filter { it.isNotBlank() },
         )
     }
 
@@ -92,5 +96,6 @@ class TokenStore @Inject constructor(context: Context) {
         const val KEY_SCHOOL_ID = "school_id"
         const val KEY_SCHOOL_CODE = "school_code"
         const val KEY_SCHOOL_NAME = "school_name"
+        const val KEY_ENTRY_FIELDS = "entry_fields"
     }
 }

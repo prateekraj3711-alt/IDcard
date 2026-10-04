@@ -2,40 +2,23 @@ name: CI
 
 on:
   push:
-    branches: [main, "claude/**"]
+    branches: [main]
   pull_request:
 
 jobs:
-  backend:
+  web:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.12"
-          cache: pip
+      - uses: oven-sh/setup-bun@v2
       - name: Install
-        working-directory: backend
-        run: pip install -r requirements.txt
-      - name: Compile
-        working-directory: backend
-        run: python -m compileall -q app scripts
-
-  dashboard:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: "22"
-      - name: Install
-        working-directory: dashboard
-        run: npm install --no-audit --no-fund
+        run: bun install
       - name: Type-check
-        working-directory: dashboard
-        run: npx tsc -b
+        run: bunx tsc --noEmit -p .
       - name: Build
-        working-directory: dashboard
         env:
-          VITE_API_BASE_URL: https://idcard-api-ppti.onrender.com/api/v1
-        run: npm run build
+          VITE_SUPABASE_URL: https://ulwteirumuhwbnlnzjtj.supabase.co
+          VITE_SUPABASE_PUBLISHABLE_KEY: sb_publishable_P7OLThPSjipU84wOwPp6FQ_Dqr1_0_n
+          VITE_SUPABASE_PROJECT_ID: ulwteirumuhwbnlnzjtj
+        run: bun run build

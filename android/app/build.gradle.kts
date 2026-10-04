@@ -12,7 +12,7 @@ plugins {
 val configuredApiBaseUrl: String = (
     (project.findProperty("apiBaseUrl") as String?)
         ?: System.getenv("API_BASE_URL")
-        ?: "https://idcard-api-ppti.onrender.com/api/v1/"
+        ?: "https://project--45371be8-44e2-463b-a814-0d4e05171128.lovable.app/api/public/v1/"
 ).let { if (it.endsWith("/")) it else "$it/" }
 
 android {
@@ -41,7 +41,7 @@ android {
             // to fall back to the emulator loopback address instead.
             val debugUrl = (project.findProperty("apiBaseUrl") as String?)
                 ?: System.getenv("API_BASE_URL")
-                ?: "http://10.0.2.2:8000/api/v1/"
+                ?: "https://project--45371be8-44e2-463b-a814-0d4e05171128-dev.lovable.app/api/public/v1/"
             buildConfigField("String", "API_BASE_URL", "\"${if (debugUrl.endsWith("/")) debugUrl else "$debugUrl/"}\"")
         }
     }

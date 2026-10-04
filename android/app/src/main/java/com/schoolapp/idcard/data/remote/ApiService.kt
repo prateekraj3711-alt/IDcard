@@ -2,9 +2,6 @@ package com.schoolapp.idcard.data.remote
 
 import com.schoolapp.idcard.data.remote.dto.LoginRequestDto
 import com.schoolapp.idcard.data.remote.dto.LoginResponseDto
-import com.schoolapp.idcard.data.remote.dto.PhotoCompleteDto
-import com.schoolapp.idcard.data.remote.dto.PhotoUploadUrlDto
-import com.schoolapp.idcard.data.remote.dto.PhotoUploadRequestDto
 import com.schoolapp.idcard.data.remote.dto.RefreshRequestDto
 import com.schoolapp.idcard.data.remote.dto.SchoolMiniDto
 import com.schoolapp.idcard.data.remote.dto.StudentDto
@@ -12,7 +9,11 @@ import com.schoolapp.idcard.data.remote.dto.SyncBatchRequestDto
 import com.schoolapp.idcard.data.remote.dto.SyncBatchResponseDto
 import com.schoolapp.idcard.data.remote.dto.TeacherSignupRequestDto
 import com.schoolapp.idcard.data.remote.dto.TokenPairDto
+import com.schoolapp.idcard.data.remote.dto.PhotoUploadResultDto
+import okhttp3.MultipartBody
 import retrofit2.http.Body
+import retrofit2.http.Multipart
+import retrofit2.http.Part
 import retrofit2.http.GET
 import retrofit2.http.Header
 import retrofit2.http.POST
@@ -40,15 +41,11 @@ interface ApiService {
     @POST("sync/batch")
     suspend fun syncBatch(@Body body: SyncBatchRequestDto): SyncBatchResponseDto
 
-    @POST("students/{id}/photo/upload-url")
-    suspend fun photoUploadUrl(
+    /** Direct authenticated upload (replaces the old S3/R2 presigned-URL flow). */
+    @Multipart
+    @POST("students/{id}/photo")
+    suspend fun uploadPhoto(
         @Path("id") studentId: String,
-        @Body req: PhotoUploadRequestDto,
-    ): PhotoUploadUrlDto
-
-    @POST("students/{id}/photo/complete")
-    suspend fun photoComplete(
-        @Path("id") studentId: String,
-        @Body req: PhotoCompleteDto,
-    ): Unit
+        @Part file: MultipartBody.Part,
+    ): PhotoUploadResultDto
 }
