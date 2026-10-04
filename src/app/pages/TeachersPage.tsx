@@ -9,6 +9,7 @@ import {
 } from '@mui/material';
 import ContentCopyIcon from '@mui/icons-material/ContentCopy';
 import RefreshIcon from '@mui/icons-material/Refresh';
+import DeleteIcon from '@mui/icons-material/DeleteOutline';
 import { DataGrid, GridColDef } from '@mui/x-data-grid';
 import { ClassesApi, SchoolsApi, TeachersApi } from '@/app/api/endpoints';
 import EditIcon from '@mui/icons-material/Edit';
@@ -48,14 +49,23 @@ export function TeachersPage() {
     },
   });
 
+  const [delFor, setDelFor] = useState<{ id: string; name: string } | null>(null);
+  const del = useMutation({
+    mutationFn: (id: string) => TeachersApi.delete(id),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['teachers'] }); setDelFor(null); },
+  });
+
+  const [pwFor, setPwFor] = useState<{ id: string; name: string } | null>(null);
+  const [newPw, setNewPw] = useState('');
   const regenerate = useMutation({
-    mutationFn: TeachersApi.regeneratePassword,
-    onSuccess: (r) => setIssued(r.credentials),
+    mutationFn: (v: { id: string; password?: string }) => TeachersApi.regeneratePassword(v.id, v.password),
+    onSuccess: (r) => { setPwFor(null); setNewPw(''); setIssued(r.credentials); },
   });
 
   const columns: GridColDef[] = [
     { field: 'full_name', headerName: 'Name', flex: 1 },
-    { field: 'email', headerName: 'Email', flex: 1 },
+    { field: 'username', headerName: 'User ID', width: 150, valueGetter: (_v, row) => row.username ?? '—' },
+    { field: 'email', headerName: 'Email', flex: 1, valueGetter: (_v, row) => (row.email?.endsWith('@no-email.local') ? '—' : row.email) },
     {
       field: 'school',
       headerName: 'Organization',
@@ -66,7 +76,7 @@ export function TeachersPage() {
     { field: 'is_active', headerName: 'Active', width: 100, type: 'boolean' },
     { field: 'last_login_at', headerName: 'Last login', width: 200 },
     {
-      field: 'actions', headerName: '', width: 110, sortable: false,
+      field: 'actions', headerName: '', width: 150, sortable: false,
       renderCell: (p) => (
         <>
         <Tooltip title="Change class">
@@ -74,9 +84,14 @@ export function TeachersPage() {
             <EditIcon fontSize="small" />
           </IconButton>
         </Tooltip>
-        <Tooltip title="Reset password">
-          <IconButton size="small" onClick={() => regenerate.mutate(p.row.id)}>
+        <Tooltip title="Change or regenerate password">
+          <IconButton size="small" onClick={() => { setNewPw(''); setPwFor({ id: p.row.id, name: p.row.full_name }); }}>
             <RefreshIcon fontSize="small" />
+          </IconButton>
+        </Tooltip>
+        <Tooltip title="Delete user">
+          <IconButton size="small" onClick={() => setDelFor({ id: p.row.id, name: p.row.full_name })}>
+            <DeleteIcon fontSize="small" />
           </IconButton>
         </Tooltip>
         </>
@@ -140,6 +155,44 @@ export function TeachersPage() {
       />
 
       {classFor && <ClassDialog target={classFor} onClose={() => setClassFor(null)} />}
+
+      <Dialog open={!!delFor} onClose={() => setDelFor(null)} fullWidth maxWidth="xs">
+        <DialogTitle>Delete {delFor?.name}?</DialogTitle>
+        <DialogContent>
+          <Typography variant="body2" color="text.secondary">
+            They'll lose access immediately. The account is archived, not wiped — their candidates and history are kept.
+          </Typography>
+          {del.error && <Alert severity="error" sx={{ mt: 2 }}>{(del.error as Error).message}</Alert>}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setDelFor(null)}>Cancel</Button>
+          <Button variant="contained" color="error" disabled={del.isPending}
+            onClick={() => delFor && del.mutate(delFor.id)}>
+            {del.isPending ? 'Deleting…' : 'Delete'}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      <Dialog open={!!pwFor} onClose={() => setPwFor(null)} fullWidth maxWidth="xs">
+        <DialogTitle>Password for {pwFor?.name}</DialogTitle>
+        <DialogContent>
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+            Passwords are stored scrambled, so the current one can't be shown. Set a new one or generate one — it will be shown to you after saving.
+          </Typography>
+          <TextField
+            fullWidth label="New password" value={newPw} onChange={(e) => setNewPw(e.target.value)}
+            helperText={newPw && newPw.length < 8 ? 'At least 8 characters' : 'Leave blank to generate one automatically'}
+            error={!!newPw && newPw.length < 8}
+          />
+          {regenerate.error && <Alert severity="error" sx={{ mt: 2 }}>{(regenerate.error as Error).message}</Alert>}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setPwFor(null)}>Cancel</Button>
+          <Button disabled={regenerate.isPending} onClick={() => pwFor && regenerate.mutate({ id: pwFor.id })}>Generate new</Button>
+          <Button variant="contained" disabled={regenerate.isPending || newPw.length < 8}
+            onClick={() => pwFor && regenerate.mutate({ id: pwFor.id, password: newPw })}>Save password</Button>
+        </DialogActions>
+      </Dialog>
 
       <CredentialsDialog open={!!issued} creds={issued} onClose={() => setIssued(null)} />
     </Box>
