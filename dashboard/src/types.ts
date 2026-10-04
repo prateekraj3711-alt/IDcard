@@ -15,6 +15,8 @@ export interface School {
   is_active: boolean;
   principal_name?: string | null;
   logo_url?: string | null;
+  signature_path?: string | null;
+  logo_path?: string | null;
   created_at: string;
 }
 
@@ -76,6 +78,12 @@ export interface Student {
   enrolled_on: string | null;
   status: 'draft' | 'submitted' | 'active' | 'archived';
   primary_photo_url?: string | null;
+  photo_path?: string | null;
+  photo_hash?: string | null;
+  class_name?: string | null;
+  section_name?: string | null;
+  school_name?: string | null;
+  extra?: Record<string, string> | null;
   created_at: string;
   updated_at: string;
 }
@@ -90,6 +98,7 @@ export interface IdCardJob {
   total: number;
   processed: number;
   output_key: string | null;
+  file_size?: number | null;
   download_url?: string | null;
   error?: string | null;
   created_at: string;
@@ -150,6 +159,12 @@ export interface TemplateElement {
   url?: string;             // signed URL from server (read-only)
   rotation?: number;
   locked?: boolean;         // if true, cannot be dragged/transformed in the editor
+  prefix?: string;          // label drawn before the value, e.g. "Name:"
+  wrap?: boolean;           // wrap long text onto new lines (default true)
+  lineHeight?: number;      // multiple of font size (default 1.2)
+  fontWeight?: 'normal' | 'bold';
+  maxLines?: number;
+  pinned?: boolean;         // label is printed on the design: never move, fit in place
 }
 
 export interface FieldCatalogEntry {
@@ -180,6 +195,7 @@ export interface BulkImportCommitResult {
   imported: number;
   failed: number;
   photos_matched: number;
+  student_ids?: string[];
 }
 
 export interface LoginResponse {
@@ -194,4 +210,25 @@ export interface LoginResponse {
     role: 'super_admin' | 'teacher';
     school?: { id: string; code: string; name: string } | null;
   };
+}
+
+export interface SchoolClass {
+  id: string;
+  name: string;
+  ordering: number;
+  sections: Array<{ id: string; name: string; ordering: number }>;
+}
+
+export interface IdCard {
+  id: string;
+  student_id: string;
+  school_id: string;
+  template_id: string | null;
+  storage_path: string;
+  file_name: string;
+  file_size: number;
+  mime_type: string;
+  created_at: string;
+  id_card_templates?: { name: string } | null;
+  students?: { name: string; enrollment_no: string } | null;
 }

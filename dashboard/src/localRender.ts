@@ -15,6 +15,8 @@ import type { TemplateLayout, TemplateElement } from '@/app/types';
 export interface RenderSubject {
   bindings: Record<string, string | undefined>;
   photoDataUrl?: string;       // data: URL for the student's local photo
+  signatureDataUrl?: string;   // organization's authorised signature
+  logoDataUrl?: string;        // organization's logo
   qrPayload?: Record<string, unknown>;
 }
 
@@ -87,7 +89,18 @@ function planText(ctx: CanvasRenderingContext2D, el: TemplateElement, text: stri
   let size = el.fontSize ?? 14;
   const wrap = el.wrap !== false;
   const w = Math.max(1, el.width ?? 0);
-  const minSize = Math.max(6, size * 0.7);
+  const minSize = Math.max(6, size * (el.pinned ? 0.5 : 0.7));
+  // Pinned fields sit next to labels printed on the design: prefer one line,
+  // shrinking a little, before wrapping.
+  if (el.pinned && w > 1) {
+    for (let s = size; s >= size * 0.65; s -= 1) {
+      ctx.font = fontFor(el, s);
+      if (ctx.measureText(text).width <= w) {
+        const lineH = s * (el.lineHeight ?? 1.2);
+        return { lines: [text], size: s, lineH, height: lineH };
+      }
+    }
+  }
   for (;;) {
     ctx.font = fontFor(el, size);
     const lineH = size * (el.lineHeight ?? 1.2);
@@ -117,9 +130,20 @@ export function layoutElements(
     const { el } = item;
     if (el.kind !== 'text') { result.set(el, { y: item.y }); continue; }
     const text = textFor(el, subject);
-    const room = layout.height - item.y;
+    let room = layout.height - item.y;
+    if (el.pinned) {
+      // Never move anything: fit inside the gap down to the next field below.
+      const x0 = el.x ?? 0, x1 = x0 + (el.width ?? 0);
+      for (const o of order) {
+        if (o === item) continue;
+        const ox0 = o.el.x ?? 0, ox1 = ox0 + (o.el.width ?? 0);
+        if (ox0 < x1 && ox1 > x0 && o.y > item.y + 1) room = Math.min(room, o.y - item.y);
+      }
+      room = Math.max(room, el.height ?? 0);
+    }
     const plan = planText(ctx, el, text, room);
     result.set(el, { y: item.y, plan, text });
+    if (el.pinned) continue;
     const boxH = Math.max(el.height ?? 0, (el.fontSize ?? 14) * (el.lineHeight ?? 1.2));
     const extra = plan.height - boxH;
     if (extra <= 0) continue;
@@ -151,19 +175,31 @@ async function drawElement(
     const align = el.align ?? 'left';
     ctx.textAlign = align === 'center' ? 'center' : align === 'right' ? 'right' : 'left';
     const anchorX = align === 'center' ? x + w / 2 : align === 'right' ? x + w : x;
-    plan.lines.forEach((line, i) => ctx.fillText(line, anchorX, y + i * plan.lineH));
+    // Pinned values: centre the first line on the printed label's line.
+    const slot = Math.min(h, (el.fontSize ?? 14) * 1.35);
+    const dy = el.pinned ? Math.max(0, (slot - plan.size) / 2) : 0;
+    plan.lines.forEach((line, i) => ctx.fillText(line, anchorX, y + dy + i * plan.lineH));
     return;
   }
 
   if (el.kind === 'image') {
     let src: string | undefined;
+    const isSign = /signature$/.test(el.binding ?? '');
+    const isLogo = /\.logo$/.test(el.binding ?? '');
     if (el.binding === 'photo' && subject.photoDataUrl) src = subject.photoDataUrl;
+    else if (isSign && subject.signatureDataUrl) src = subject.signatureDataUrl;
+    else if (isLogo && subject.logoDataUrl) src = subject.logoDataUrl;
     else if (el.url) src = el.url;
     else if (el.src) src = el.src;
-    if (!src) { ctx.strokeStyle = '#888'; ctx.strokeRect(x, y, w, h); return; }
+    if (!src) { if (!isSign && !isLogo) { ctx.strokeStyle = '#888'; ctx.strokeRect(x, y, w, h); } return; }
     try {
       const img = await loadImage(src);
-      ctx.drawImage(img, x, y, w, h);
+      if (isSign || isLogo) {
+        // Keep proportions; signatures sit on the caption line, centred.
+        const k = Math.min(w / img.naturalWidth, h / img.naturalHeight);
+        const dw = img.naturalWidth * k, dh = img.naturalHeight * k;
+        ctx.drawImage(img, x + (w - dw) / 2, y + (isSign ? h - dh : (h - dh) / 2), dw, dh);
+      } else ctx.drawImage(img, x, y, w, h);
     } catch { ctx.strokeStyle = '#888'; ctx.strokeRect(x, y, w, h); }
     return;
   }

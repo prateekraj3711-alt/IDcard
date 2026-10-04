@@ -1,6 +1,7 @@
+import { friendlyError } from '@/app/media';
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from '@/app/router-shim';
 import {
   Alert, Box, Button, ButtonGroup, Card, CardActions, CardContent, Chip, Dialog, DialogActions,
   DialogContent, DialogTitle, Grid, IconButton, MenuItem, Stack, TextField, Tooltip, Typography,
@@ -8,9 +9,9 @@ import {
 import AddIcon from '@mui/icons-material/Add';
 import UploadIcon from '@mui/icons-material/Upload';
 import DownloadIcon from '@mui/icons-material/Download';
-import { SchoolsApi, TemplatesApi } from '@/api/endpoints';
-import type { TemplateModule } from '@/types';
-import { api } from '@/api/client';
+import { SchoolsApi, TemplatesApi } from '@/app/api/endpoints';
+import type { TemplateModule } from '@/app/types';
+
 
 export function TemplatesPage() {
   const nav = useNavigate();
@@ -23,7 +24,7 @@ export function TemplatesPage() {
   });
 
   const downloadExport = async (id: string, name: string) => {
-    const resp = await api.get(`/templates/${id}/export`);
+    const resp = { data: await TemplatesApi.exportJson(id) };
     const blob = new Blob([JSON.stringify(resp.data, null, 2)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -148,7 +149,7 @@ function ImportTemplateDialog({
             startIcon={<UploadIcon />}
           >
             {file ? file.name : 'Choose .json, .png, or .jpg'}
-            <input hidden type="file" accept=".json,.png,.jpg,.jpeg,application/json,image/*"
+            <input hidden type="file" accept=".json,.png,.jpg,.jpeg,.heic,.heif,application/json,image/*"
               onChange={(e) => setFile(e.target.files?.[0] ?? null)} />
           </Button>
           <TextField
@@ -163,7 +164,7 @@ function ImportTemplateDialog({
             <MenuItem value="employee">Employee</MenuItem>
           </TextField>
           <TextField
-            select label="School (optional)" value={schoolId}
+            select label="Organization (optional)" value={schoolId}
             onChange={(e) => setSchoolId(e.target.value)}
             helperText="Leave blank to make this a system-wide template"
           >
@@ -173,7 +174,7 @@ function ImportTemplateDialog({
             ))}
           </TextField>
           {mut.isError && <Alert severity="error">
-            {(mut.error as { response?: { data?: { detail?: string } } }).response?.data?.detail ?? 'Import failed'}
+            {friendlyError(mut.error, 'Import failed')}
           </Alert>}
         </Stack>
       </DialogContent>

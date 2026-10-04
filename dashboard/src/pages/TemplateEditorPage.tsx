@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate } from '@/app/router-shim';
 import {
   Box, Button, Card, CardContent, Chip, Dialog, DialogActions, DialogContent, DialogTitle, Divider, FormControlLabel, IconButton, MenuItem, Paper,
   Stack, Switch, TextField, ToggleButton, ToggleButtonGroup, Tooltip, Typography,
@@ -10,15 +10,24 @@ import SaveIcon from '@mui/icons-material/Save';
 import LockIcon from '@mui/icons-material/Lock';
 import LockOpenIcon from '@mui/icons-material/LockOpen';
 import VisibilityIcon from '@mui/icons-material/Visibility';
-import { renderCardCanvas } from '@/localRender';
+import { renderCardCanvas } from '@/app/localRender';
 import { Stage, Layer, Rect, Text as KText, Image as KImage, Transformer } from 'react-konva';
 import useImage from 'use-image';
 import Konva from 'konva';
-import { TemplatesApi } from '@/api/endpoints';
-import type { FieldCatalogEntry, Template, TemplateElement, TemplateLayout, TemplateModule } from '@/types';
+import { TemplatesApi, autoPlaceFields } from '@/app/api/endpoints';
+import AutoFixHighIcon from '@mui/icons-material/AutoFixHigh';
+import type { FieldCatalogEntry, Template, TemplateElement, TemplateLayout, TemplateModule } from '@/app/types';
 
 const DEFAULT_CARD_W = 340;
 const DEFAULT_CARD_H = 214;
+const CARD_SIZE_PRESETS: { label: string; wMm: number; hMm: number }[] = [
+  { label: '54 × 86 mm (portrait)', wMm: 54, hMm: 86 },
+  { label: '86 × 54 mm (landscape)', wMm: 86, hMm: 54 },
+  { label: '85.6 × 54 mm (CR80)', wMm: 85.6, hMm: 54 },
+  { label: '54 × 85.6 mm (CR80 portrait)', wMm: 54, hMm: 85.6 },
+  { label: '70 × 100 mm', wMm: 70, hMm: 100 },
+  { label: '100 × 70 mm', wMm: 100, hMm: 70 },
+];
 const PALETTE_KIND_COLOR: Record<string, string> = {
   text: '#EAF1FF', image: '#FFF4E0', qr: '#E7F8EA', barcode: '#F0E7FA',
 };
@@ -63,22 +72,58 @@ export function TemplateEditorPage() {
         background_image: layout.background_image
           ? { storage_key: layout.background_image.storage_key, locked: layout.background_image.locked ?? true }
           : undefined,
-        elements: layout.elements.map(({ url: _u, ...e }: any) => e),
+        elements: layout.elements.map(({ url: _u, ...e }) => e),
       };
       const body: Partial<Template> = { name, module, layout_json: clean };
       return isNew ? TemplatesApi.create(body) : TemplatesApi.update(id!, body);
     },
-    onSuccess: (t: any) => {
+    onSuccess: (t) => {
       qc.invalidateQueries({ queryKey: ['templates'] });
       nav(`/templates/${t.id}`, { replace: true });
     },
   });
 
+  const currentMm = {
+    w: layout.width / (layout.dpi ?? 300) * 25.4,
+    h: layout.height / (layout.dpi ?? 300) * 25.4,
+  };
+  const cardSizePreset =
+    CARD_SIZE_PRESETS.find((p) => Math.abs(p.wMm - currentMm.w) < 1 && Math.abs(p.hMm - currentMm.h) < 1)?.label
+    ?? 'Custom';
+
+  // Resize the card to a preset: px are derived from mm at the current DPI and
+  // every element + the background is scaled proportionally so auto-placed
+  // fields keep their relative positions.
+  const applyCardSize = (label: string) => {
+    const preset = CARD_SIZE_PRESETS.find((p) => p.label === label);
+    if (!preset) return;
+    setLayout((l) => {
+      const dpi = l.dpi ?? 300;
+      const w = Math.round(preset.wMm / 25.4 * dpi);
+      const h = Math.round(preset.hMm / 25.4 * dpi);
+      const sx = w / l.width;
+      const sy = h / l.height;
+      return {
+        ...l,
+        width: w,
+        height: h,
+        elements: l.elements.map((e) => ({
+          ...e,
+          x: Math.round(e.x * sx),
+          y: Math.round(e.y * sy),
+          width: Math.round(e.width * sx),
+          height: Math.round(e.height * sy),
+          fontSize: e.fontSize ? Math.max(4, Math.round(e.fontSize * Math.min(sx, sy))) : e.fontSize,
+        })),
+      };
+    });
+  };
+
   const addFromCatalog = (entry: FieldCatalogEntry) => {
     // Scale defaults to the template's native pixel size so a 500 DPI card
     // gets big-enough elements to place, not a 24px sliver.
     const scale = Math.max(1, layout.width / 340);
-    setLayout((l: any) => ({
+    setLayout((l) => ({
       ...l,
       elements: [
         ...l.elements,
@@ -102,14 +147,14 @@ export function TemplateEditorPage() {
   };
 
   const updateElement = (elId: string, patch: Partial<TemplateElement>) => {
-    setLayout((l: any) => ({
+    setLayout((l) => ({
       ...l,
-      elements: l.elements.map((e: any) => (e.id === elId ? { ...e, ...patch } : e)),
+      elements: l.elements.map((e) => (e.id === elId ? { ...e, ...patch } : e)),
     }));
   };
 
   const removeElement = (elId: string) => {
-    setLayout((l: any) => ({ ...l, elements: l.elements.filter((e: any) => e.id !== elId) }));
+    setLayout((l) => ({ ...l, elements: l.elements.filter((e) => e.id !== elId) }));
     setSelectedId(null);
   };
 
@@ -120,7 +165,23 @@ export function TemplateEditorPage() {
   };
 
   const removeBackground = () => {
-    setLayout((l: any) => ({ ...l, background_image: undefined }));
+    setLayout((l) => ({ ...l, background_image: undefined }));
+  };
+
+  const [detecting, setDetecting] = useState(false);
+  const [detectMsg, setDetectMsg] = useState<string | null>(null);
+  const autoDetect = async () => {
+    const url = layout.background_image?.url;
+    if (!url) return;
+    if (layout.elements.some((e) => e.binding) && !confirm('Replace the current data fields with automatically detected ones?')) return;
+    setDetecting(true); setDetectMsg(null);
+    try {
+      const blob = await (await fetch(url)).blob();
+      const els = await autoPlaceFields(blob, { w: layout.width, h: layout.height });
+      setLayout((l) => ({ ...l, elements: [...l.elements.filter((e) => !e.binding), ...els] }));
+      setDetectMsg(els.length ? `Placed ${els.length} fields. Drag or resize any of them, then Save.` : 'No labels were found on this design.');
+    } catch (e) { setDetectMsg(`Could not detect fields: ${(e as Error).message}`); }
+    finally { setDetecting(false); }
   };
 
   const selectedEl = layout.elements.find((e) => e.id === selectedId) ?? null;
@@ -154,6 +215,11 @@ export function TemplateEditorPage() {
           <ToggleButton value="student">Student</ToggleButton>
           <ToggleButton value="employee">Employee</ToggleButton>
         </ToggleButtonGroup>
+        {layout.background_image?.url && (
+          <Button variant="outlined" startIcon={<AutoFixHighIcon />} disabled={detecting} onClick={autoDetect}>
+            {detecting ? 'Detecting fields…' : 'Auto-place fields'}
+          </Button>
+        )}
         <Button variant="outlined" startIcon={<VisibilityIcon />} onClick={() => setPreviewOpen(true)}>
           Preview with long text
         </Button>
@@ -165,6 +231,7 @@ export function TemplateEditorPage() {
           {save.isPending ? 'Saving…' : 'Save template'}
         </Button>
       </Stack>
+      {detectMsg && <Typography sx={{ mb: 2 }} color={detectMsg.startsWith('Could not') ? 'error' : 'success.main'}>{detectMsg}</Typography>}
 
       <Stack direction="row" spacing={2}>
         <Card sx={{ width: 260, alignSelf: 'flex-start' }}>
@@ -194,21 +261,31 @@ export function TemplateEditorPage() {
               <TextField label="Template name" size="small" value={name} onChange={(e) => setName(e.target.value)} />
               <TextField
                 label="Width (px)" size="small" type="number" value={layout.width}
-                onChange={(e) => setLayout((l: any) => ({ ...l, width: Number(e.target.value) }))}
+                onChange={(e) => setLayout((l) => ({ ...l, width: Number(e.target.value) }))}
                 sx={{ width: 120 }}
               />
               <TextField
                 label="Height (px)" size="small" type="number" value={layout.height}
-                onChange={(e) => setLayout((l: any) => ({ ...l, height: Number(e.target.value) }))}
+                onChange={(e) => setLayout((l) => ({ ...l, height: Number(e.target.value) }))}
                 sx={{ width: 120 }}
               />
               <TextField
                 select label="DPI" size="small" value={layout.dpi ?? 300}
-                onChange={(e) => setLayout((l: any) => ({ ...l, dpi: Number(e.target.value) }))}
+                onChange={(e) => setLayout((l) => ({ ...l, dpi: Number(e.target.value) }))}
                 sx={{ width: 100 }}
               >
                 {[72, 96, 150, 200, 300, 400, 500, 600].map((d) => (
                   <MenuItem key={d} value={d}>{d}</MenuItem>
+                ))}
+              </TextField>
+              <TextField
+                select label="Card size" size="small" value={cardSizePreset}
+                onChange={(e) => applyCardSize(e.target.value)}
+                sx={{ width: 190 }}
+              >
+                {cardSizePreset === 'Custom' && <MenuItem value="Custom" disabled>Custom</MenuItem>}
+                {CARD_SIZE_PRESETS.map((p) => (
+                  <MenuItem key={p.label} value={p.label}>{p.label}</MenuItem>
                 ))}
               </TextField>
               <Chip
@@ -265,6 +342,11 @@ export function TemplateEditorPage() {
                         onChange={(e) => updateElement(selectedEl.id, { wrap: e.target.checked })} />}
                       label="Wrap long text to new lines"
                     />
+                    <FormControlLabel
+                      control={<Switch checked={!!selectedEl.pinned}
+                        onChange={(e) => updateElement(selectedEl.id, { pinned: e.target.checked })} />}
+                      label="Keep in place (label is printed on the design)"
+                    />
                     <Stack direction="row" spacing={1}>
                       <TextField label="Line spacing" size="small" type="number" inputProps={{ step: 0.1, min: 0.8, max: 3 }}
                         value={selectedEl.lineHeight ?? 1.2}
@@ -278,6 +360,13 @@ export function TemplateEditorPage() {
                         onChange={(e) => updateElement(selectedEl.id, { fontWeight: e.target.checked ? 'bold' : 'normal' })} />}
                       label="Bold"
                     />
+                    <TextField
+                      select label="Font" size="small" value={FONTS.find((f) => f.value === selectedEl.fontFamily)?.value ?? selectedEl.fontFamily ?? 'Inter'}
+                      onChange={(e) => updateElement(selectedEl.id, { fontFamily: e.target.value })}
+                    >
+                      {[...FONTS, ...(selectedEl.fontFamily && !FONTS.some((f) => f.value === selectedEl.fontFamily) && selectedEl.fontFamily !== 'Inter' ? [{ label: selectedEl.fontFamily, value: selectedEl.fontFamily }] : [])]
+                        .map((f) => <MenuItem key={f.value} value={f.value} sx={{ fontFamily: f.value }}>{f.label}</MenuItem>)}
+                    </TextField>
                     <TextField
                       label="Font size" size="small" type="number" value={selectedEl.fontSize ?? 14}
                       onChange={(e) => updateElement(selectedEl.id, { fontSize: Number(e.target.value) })}
@@ -348,12 +437,24 @@ export function TemplateEditorPage() {
   );
 }
 
+const FONTS = [
+  { label: 'Inter', value: 'Inter' },
+  { label: 'Arial', value: 'Arial, Helvetica, "Liberation Sans", sans-serif' },
+  { label: 'Arial Narrow', value: '"Arial Narrow", "Roboto Condensed", "Liberation Sans Narrow", sans-serif' },
+  { label: 'Verdana', value: 'Verdana, Geneva, sans-serif' },
+  { label: 'Tahoma', value: 'Tahoma, Verdana, sans-serif' },
+  { label: 'Times New Roman', value: '"Times New Roman", Times, "Liberation Serif", serif' },
+  { label: 'Georgia', value: 'Georgia, serif' },
+  { label: 'Courier New', value: '"Courier New", Courier, monospace' },
+  { label: 'Impact', value: 'Impact, "Arial Black", sans-serif' },
+];
+
 const SAMPLE: Record<string, string> = {
   name: 'Prateek Raj Kumar Singh Chauhan', enrollment_no: 'EMP-2026-00421', employee_id: 'EMP-2026-00421',
   dob: '1994-07-15', age: '32', blood_group: 'B+', gender: 'male', mobile: '+919876543210',
   address: 'Flat 12B, Sunrise Apartments, MG Road, Indiranagar, Bengaluru, Karnataka 560038',
   father_name: 'Rajendra Kumar Singh', mother_name: 'Sunita Devi', designation: 'Senior Operations Manager',
-  department: 'Logistics & Supply Chain', doj: '2021-04-01', class_section: 'X - A', roll_no: '17',
+  department: 'Logistics & Supply Chain', doj: '2021-04-01', class_section: 'X - A', class: 'X', section: 'A', roll_no: '17',
   email: 'prateek.raj@example.com', valid_till: '2027-03-31', emergency_contact: '+919812345678',
 };
 
@@ -420,7 +521,7 @@ function CanvasEditor({
               onResize={(w, h) => onBgUpdate({ width: w, height: h })}
             />
           )}
-          {layout.elements.map((el: any) => (
+          {layout.elements.map((el) => (
             <ElementNode
               key={el.id} el={el}
               onSelect={() => onSelect(el.id)}
