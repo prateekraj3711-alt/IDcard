@@ -95,7 +95,9 @@ object AppModule {
 
     @Provides @Singleton
     fun provideDatabase(@ApplicationContext ctx: Context): AppDatabase =
-        Room.databaseBuilder(ctx, AppDatabase::class.java, "idcard.db").build()
+        Room.databaseBuilder(ctx, AppDatabase::class.java, "idcard.db")
+            .addMigrations(com.schoolapp.idcard.data.local.MIGRATION_1_2)
+            .build()
 
     @Provides fun provideStudentDao(db: AppDatabase): StudentDao = db.studentDao()
     @Provides fun providePendingOpDao(db: AppDatabase): PendingOpDao = db.pendingOpDao()
