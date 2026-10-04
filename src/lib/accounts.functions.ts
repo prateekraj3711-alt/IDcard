@@ -75,7 +75,10 @@ export const createAccount = createServerFn({ method: "POST" })
     z.object({
       role: z.enum(["super_admin", "teacher"]),
       full_name: z.string().trim().min(1).max(150),
-      email: z.string().trim().email().max(255).optional(),
+      email: z.preprocess(
+        (v) => (typeof v === "string" && v.trim() === "" ? undefined : v),
+        z.string().trim().email().max(255).optional(),
+      ),
       phone: z.string().trim().max(20).optional(),
       username: z.string().trim().max(50).optional(),
       password: z.string().min(8).max(72).optional(),
@@ -124,11 +127,11 @@ export const createAccount = createServerFn({ method: "POST" })
 
 export const regenerateAccountPassword = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((d) => z.object({ user_id: z.string().uuid() }).parse(d))
+  .inputValidator((d) => z.object({ user_id: z.string().uuid(), password: z.string().min(8).max(72).optional() }).parse(d))
   .handler(async ({ data, context }) => {
     await assertSuperAdmin(context as unknown as Ctx);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const password = generatePassword();
+    const password = data.password || generatePassword();
     const { error } = await supabaseAdmin.auth.admin.updateUserById(data.user_id, { password });
     if (error) throw new Error(error.message);
     const { data: p } = await supabaseAdmin.from("profiles").select("username, email").eq("id", data.user_id).single();
