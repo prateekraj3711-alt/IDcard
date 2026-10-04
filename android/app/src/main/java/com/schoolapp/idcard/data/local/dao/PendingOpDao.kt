@@ -16,6 +16,9 @@ interface PendingOpDao {
     @Query("UPDATE pending_ops SET attempts = attempts + 1, lastError = :err, nextAttemptAt = :next WHERE id = :id")
     suspend fun markFailed(id: Long, err: String?, next: Long)
 
+    @Query("SELECT * FROM pending_ops WHERE entityUuid = :uuid AND entityType = 'student' ORDER BY createdAt ASC")
+    suspend fun forStudent(uuid: String): List<PendingOpEntity>
+
     @Query("DELETE FROM pending_ops WHERE id = :id")
     suspend fun remove(id: Long)
 }
