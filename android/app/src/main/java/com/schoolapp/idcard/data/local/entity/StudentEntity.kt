@@ -27,5 +27,7 @@ data class StudentEntity(
     val syncStatus: SyncStatus = SyncStatus.PENDING,
     val lastSyncError: String? = null,
     val localPhotoPath: String? = null,
+    val extraJson: String? = null,     // JSON object of extra.<key> details
+
     val updatedAt: Long = System.currentTimeMillis(),
 )
