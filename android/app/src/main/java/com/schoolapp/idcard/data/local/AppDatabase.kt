@@ -16,14 +16,14 @@ import com.schoolapp.idcard.data.local.entity.StudentEntity
     exportSchema = false,
 )
 @TypeConverters(Converters::class)
-val MIGRATION_1_2 = object : androidx.room.migration.Migration(1, 2) {
-    override fun migrate(db: androidx.sqlite.db.SupportSQLiteDatabase) {
-        db.execSQL("ALTER TABLE students ADD COLUMN extraJson TEXT")
-    }
-}
-
 abstract class AppDatabase : RoomDatabase() {
     abstract fun studentDao(): StudentDao
     abstract fun pendingOpDao(): PendingOpDao
     abstract fun pendingPhotoDao(): PendingPhotoDao
+}
+
+val MIGRATION_1_2 = object : androidx.room.migration.Migration(1, 2) {
+    override fun migrate(db: androidx.sqlite.db.SupportSQLiteDatabase) {
+        db.execSQL("ALTER TABLE students ADD COLUMN extraJson TEXT")
+    }
 }
