@@ -62,7 +62,7 @@ data class StudentDto(
     val school_id: String,
     val class_id: String? = null,
     val section_id: String? = null,
-    val enrollment_no: String,
+    val enrollment_no: String? = null,
     val roll_no: String? = null,
     val name: String,
     val father_name: String? = null,
@@ -73,7 +73,8 @@ data class StudentDto(
     val address: String? = null,
     val mobile: String? = null,
     val enrolled_on: String? = null,
-    val status: String = "submitted",
+    val status: String = "active",
+    val extra: Map<String, String>? = null,
 )
 
 @Serializable
