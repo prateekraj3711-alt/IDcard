@@ -50,7 +50,7 @@ fun StudentEditScreen(
 
     LaunchedEffect(state.savedOnce) {
         if (state.savedOnce) {
-            snackbarHostState.showSnackbar("Candidate submitted — added to sync queue")
+            snackbarHostState.showSnackbar("Candidate saved")
             vm.clearSavedFlag()
         }
     }
@@ -59,7 +59,7 @@ fun StudentEditScreen(
         topBar = {
             BrandTopBar(
                 title = if (studentClientUuid == null) "New candidate" else "Edit candidate",
-                subtitle = "Draft saved locally until synced",
+                subtitle = "Uploads automatically when online",
                 onNavigateBack = onSaved,
                 actions = {
                     TextButton(onClick = { vm.clearForm() }) {
@@ -209,7 +209,7 @@ fun StudentEditScreen(
             OutlinedTextField(state.name, vm::onName, label = { Text("Full name *") }, modifier = Modifier.fillMaxWidth())
             Spacer(Modifier.height(8.dp))
             if (state.ask("enrollment_no")) {
-                OutlinedTextField(state.enrollmentNo, vm::onEnrollment, label = { Text("Enrollment No *") }, modifier = Modifier.fillMaxWidth())
+                OutlinedTextField(state.enrollmentNo, vm::onEnrollment, label = { Text("ID / Enrollment No") }, modifier = Modifier.fillMaxWidth())
                 Spacer(Modifier.height(8.dp))
             }
             if (state.ask("roll_no")) {
@@ -217,11 +217,26 @@ fun StudentEditScreen(
                 Spacer(Modifier.height(8.dp))
             }
             if (state.ask("dob")) {
-                OutlinedTextField(state.dob ?: "", vm::onDob, label = { Text("DOB (YYYY-MM-DD)") }, modifier = Modifier.fillMaxWidth())
+                OutlinedTextField(state.dob ?: "", vm::onDob, label = { Text("Date of birth (YYYY-MM-DD)") }, modifier = Modifier.fillMaxWidth())
                 Spacer(Modifier.height(8.dp))
             }
             if (state.ask("blood_group")) {
                 OutlinedTextField(state.bloodGroup ?: "", vm::onBloodGroup, label = { Text("Blood Group") }, modifier = Modifier.fillMaxWidth())
+                Spacer(Modifier.height(8.dp))
+            }
+
+            if (state.ask("gender")) {
+                Text("Gender", style = MaterialTheme.typography.bodySmall)
+                Row {
+                    listOf("male" to "Male", "female" to "Female", "other" to "Other").forEach { (v, l) ->
+                        FilterChip(
+                            selected = state.gender == v,
+                            onClick = { vm.onGender(if (state.gender == v) null else v) },
+                            label = { Text(l) },
+                        )
+                        Spacer(Modifier.width(8.dp))
+                    }
+                }
                 Spacer(Modifier.height(8.dp))
             }
 
@@ -249,31 +264,34 @@ fun StudentEditScreen(
                 Spacer(Modifier.height(8.dp))
             }
 
+            if (state.extraKeys.isNotEmpty()) {
+                Spacer(Modifier.height(16.dp))
+                Text("Other details", style = MaterialTheme.typography.titleSmall)
+                Spacer(Modifier.height(8.dp))
+                state.extraKeys.forEach { k ->
+                    OutlinedTextField(
+                        state.extra[k] ?: "", { vm.onExtra(k, it) },
+                        label = { Text(extraLabel(k)) }, modifier = Modifier.fillMaxWidth(),
+                    )
+                    Spacer(Modifier.height(8.dp))
+                }
+            }
+
             state.error?.let {
                 Spacer(Modifier.height(12.dp))
                 Text(it, color = MaterialTheme.colorScheme.error)
             }
 
             Spacer(Modifier.height(24.dp))
-            Row {
-                OutlinedButton(
-                    onClick = { vm.save(submit = false, onSaved) },
-                    modifier = Modifier.weight(1f),
-                    enabled = !state.saving,
-                ) {
-                    Text("Save draft")
-                }
-                Spacer(Modifier.width(12.dp))
-                Button(
-                    onClick = { vm.save(submit = true, onSaved) },
-                    modifier = Modifier.weight(1f),
-                    enabled = !state.saving,
-                ) {
-                    if (state.saving) {
-                        CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
-                    } else {
-                        Text("Submit")
-                    }
+            Button(
+                onClick = { vm.save(submit = true, onSaved) },
+                modifier = Modifier.fillMaxWidth(),
+                enabled = !state.saving,
+            ) {
+                if (state.saving) {
+                    CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
+                } else {
+                    Text("Save candidate")
                 }
             }
             Spacer(Modifier.height(24.dp))
