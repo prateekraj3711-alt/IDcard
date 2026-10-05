@@ -20,6 +20,7 @@
     "@emotion/react": "^11.14.0",
     "@emotion/styled": "^11.14.1",
     "@hookform/resolvers": "^5.2.2",
+    "@mediapipe/tasks-vision": "^1.0.1",
     "@mui/icons-material": "^6",
     "@mui/material": "^6",
     "@mui/x-data-grid": "^7",
