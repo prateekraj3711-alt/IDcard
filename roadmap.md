@@ -15,3 +15,6 @@
 - [ ] Teacher-view browser verification (needs signing in as a user/teacher account — session mint was declined this session)
 - [x] Bulk import: all column mappings optional, no auto-generated values, unmatched columns skipped
 - [x] Make email optional when adding users (not everyone has email)
+- [ ] Android: phone only shows candidates of the signed-in user (clear local data on user switch)
+- [ ] Camera zoom + auto passport crop + white background (web + Android)
+- [ ] Super admin export candidates to XLSX/CSV (selected orgs / selected candidates / single)
