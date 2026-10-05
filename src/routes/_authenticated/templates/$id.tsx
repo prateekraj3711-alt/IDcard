@@ -8,10 +8,10 @@ export const Route = createFileRoute("/_authenticated/templates/$id")({
   },
   head: () => ({
     meta: [
-      { title: "Template editor — Tirhut Technologies ID" },
-      { name: "description", content: "Template editor in the Tirhut Technologies ID candidate ID card platform." },
-      { property: "og:title", content: "Template editor — Tirhut Technologies ID" },
-      { property: "og:description", content: "Template editor in the Tirhut Technologies ID candidate ID card platform." },
+      { title: "Template editor — B&S Group ID" },
+      { name: "description", content: "Template editor in the B&S Group ID candidate ID card platform." },
+      { property: "og:title", content: "Template editor — B&S Group ID" },
+      { property: "og:description", content: "Template editor in the B&S Group ID candidate ID card platform." },
     ],
   }),
   component: TemplateEditorPage,

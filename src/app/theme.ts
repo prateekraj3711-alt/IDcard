@@ -94,5 +94,5 @@ export const theme = createTheme({
   },
 });
 
-export const BRAND_NAME = 'Tirhut Technologies a Unit of Prateek Group';
+export const BRAND_NAME = 'B&S Group';
 export const APP_TAGLINE = 'Student & Employee ID Platform';

@@ -18,4 +18,4 @@
 - [x] Android: phone only shows candidates of the signed-in user (clear local data on user switch)
 - [x] Camera zoom + auto passport crop + white background (web + Android)
 - [x] Super admin export candidates to XLSX/CSV (selected orgs / selected candidates / single)
-- [x] Rename STARK INDUSTRIES branding to Tirhut Technologies a Unit of Prateek Group (web + Android)
+- [x] Rename branding to B&S Group (web + Android)

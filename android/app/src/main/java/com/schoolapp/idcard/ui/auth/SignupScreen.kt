@@ -45,7 +45,7 @@ fun SignupScreen(
                 contentAlignment = Alignment.Center,
             ) {
                 Text(
-                    "TT",
+                    "B&S",
                     color = MaterialTheme.colorScheme.onPrimary,
                     fontWeight = FontWeight.ExtraBold,
                     style = MaterialTheme.typography.titleMedium,

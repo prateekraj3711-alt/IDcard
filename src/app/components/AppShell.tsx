@@ -92,7 +92,7 @@ export function AppShell() {
                 fontSize: 14, fontWeight: 700,
               }}
             >
-              TT
+              B&S
             </Avatar>
             <Box>
               <Typography variant="subtitle1" sx={{ fontWeight: 700, lineHeight: 1 }}>
