@@ -113,7 +113,9 @@ export const TeachersApi = {
   create: async (body: {
     school_id?: string; class_name?: string; full_name: string; email?: string; phone?: string; username?: string; password?: string;
   }) => (await createAccount({ data: { ...body, role: 'teacher' } })) as TeacherCreated,
-  setClass: async (id: string, className: string) => { await setAccountClass({ data: { user_id: id, class_name: className } }); },
+  setClass: async (id: string, className: string, schoolId?: string | null) => {
+    await setAccountClass({ data: { user_id: id, class_name: className, ...(schoolId !== undefined ? { school_id: schoolId } : {}) } });
+  },
   regeneratePassword: async (id: string, password?: string) =>
     (await regenerateAccountPassword({ data: { user_id: id, password: password || undefined } })) as PasswordResetResult,
   delete: async (id: string) => { await deleteAccount({ data: { user_id: id } }); },
@@ -697,17 +699,36 @@ const STUDENT_FIELDS = new Set(['name', 'father_name', 'mother_name', 'enrollmen
   'gender', 'address', 'mobile', 'enrolled_on', 'enrolled_year', 'photo_hint', 'class_name', 'section_name']);
 const normStem = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, '');
 
-function suggestMapping(columns: string[]) {
+const LETTER_FIELDS: Record<string, string> = {
+  n: 'name', c: 'class_name', s: 'section_name', r: 'roll_no', f: 'father_name', m: 'mother_name', a: 'address',
+  p: 'mobile', d: 'dob', e: 'enrollment_no', b: 'blood_group', g: 'gender', ph: 'photo_hint', pic: 'photo_hint', img: 'photo_hint',
+};
+const looksLikePhoto = (v: string) => /[\\/]/.test(v) || /\.(jpe?g|png|webp|gif|bmp|heic|heif|avif|tiff?)$/i.test(v);
+
+function suggestMapping(columns: string[], rows: Array<Record<string, unknown>> = []) {
   const out: Record<string, string> = {};
+  const samples = (col: string) => rows.slice(0, 20).map((r) => stringify(r[col])).filter(Boolean);
+  // Columns whose values are file paths / image names are the photo column, whatever their header says.
   for (const col of columns) {
+    const vs = samples(col);
+    if (vs.length && vs.filter(looksLikePhoto).length >= Math.ceil(vs.length / 2)) out[col.trim()] = 'photo_hint';
+  }
+  for (const col of columns) {
+    if (out[col.trim()]) continue;
     const h = col.trim();
     if (DEFAULT_COLUMN_MAPPING[h]) { out[h] = DEFAULT_COLUMN_MAPPING[h]; continue; }
     const n = normStem(h);
     if (!n) continue;
     const hit = FIELD_KEYWORDS.find(([, ps]) => ps.some((p) => (p.startsWith('=') ? n === p.slice(1) : n.includes(p))));
-    if (hit) out[h] = hit[0];
+    if (hit) { out[h] = hit[0]; continue; }
+    // Short codes like N, C, R, F, M, A, P (Name, Class, Roll, Father, Mother, Address, Phone).
+    const used = new Set(Object.values(out));
+    const byLetter = n.length <= 3 ? LETTER_FIELDS[n] : undefined;
+    if (byLetter && !used.has(byLetter)) { out[h] = byLetter; continue; }
+    const vs = samples(col);
+    if (!used.has('mobile') && vs.length && vs.every((v) => /^\+?\d[\d\s-]{9,13}$/.test(v))) { out[h] = 'mobile'; continue; }
     // Keep every other column as an extra detail so templates can still print it.
-    else out[h] = `extra:${n}`;
+    out[h] = `extra:${n}`;
   }
   return out;
 }
@@ -769,11 +790,16 @@ function mapRow(raw: Record<string, unknown>, mapping: Record<string, string>) {
 const pendingImportPhotos = new Map<string, Map<string, Blob>>();
 
 function photoFor(photos: Map<string, Blob>, mapped: Record<string, unknown>): Blob | undefined {
-  for (const k of [mapped.photo_hint, mapped.enrollment_no, mapped.name]) {
+  for (const k of [mapped.photo_hint, mapped.enrollment_no, mapped.roll_no, mapped.name]) {
     if (!k) continue;
-    const stem = normStem(String(k));
-    const hit = photos.get(stem) ?? photos.get(normStem(String(k).replace(/\.[a-z0-9]+$/i, '')));
-    if (hit) return hit;
+    // Sheets often hold a full path like C:\\Users\\...\\photo 12.jpg — only the file name matters.
+    const file = String(k).split(/[\\/]/).pop()!.trim();
+    const noExt = file.replace(/\.[a-z0-9]{2,5}$/i, '');
+    for (const cand of [normStem(noExt), normStem(file)]) {
+      if (!cand) continue;
+      const hit = photos.get(cand) ?? (/^\d+$/.test(cand) ? photos.get(cand.replace(/^0+/, '')) : undefined);
+      if (hit) return hit;
+    }
   }
   return undefined;
 }
@@ -795,7 +821,7 @@ export const BulkImportsApi = {
       .filter((r) => Object.values(r).some((v) => stringify(v) !== ''));
     if (rows.length === 0) throw new UserFacingError('No data rows found in the spreadsheet.');
     const columns = Object.keys(rows[0]);
-    const suggested = suggestMapping(columns);
+    const suggested = suggestMapping(columns, rows);
     const imp = must(await supabase.from('bulk_imports').insert({
       school_id: schoolId, source_type: lower.endsWith('.csv') ? 'csv' : 'xlsx', original_filename: file.name,
       column_mapping: suggested, status: 'uploaded', stats: { total: rows.length },
@@ -831,7 +857,8 @@ export const BulkImportsApi = {
       const fname = f.name.split('/').pop()!;
       const ext = m[1].toLowerCase();
       const type = ext === 'jpg' ? 'image/jpeg' : ext === 'tif' ? 'image/tiff' : `image/${ext}`;
-      photos.set(normStem(fname.replace(/\.[^.]+$/, '')), new Blob([await f.blob()], { type }));
+      const key = normStem(fname.replace(/\.[^.]+$/, ''));
+      photos.set(/^\d+$/.test(key) ? key.replace(/^0+/, '') || key : key, new Blob([await f.blob()], { type }));
     }
     pendingImportPhotos.set(preview.import_id, photos);
     const matched = await countPhotoMatches(preview.import_id, photos, preview.suggested_mapping);
@@ -849,7 +876,7 @@ export const BulkImportsApi = {
       const base = entry.name.split('/').pop()!;
       const stem = normStem(base.replace(/\.[^.]+$/, ''));
       const type = /\.png$/i.test(base) ? 'image/png' : 'image/jpeg';
-      photos.set(stem, new Blob([await entry.async('arraybuffer')], { type }));
+      photos.set(/^\d+$/.test(stem) ? stem.replace(/^0+/, '') || stem : stem, new Blob([await entry.async('arraybuffer')], { type }));
     }
     pendingImportPhotos.set(importId, photos);
     const rows = must(await supabase.from('bulk_import_rows').select('raw').eq('bulk_import_id', importId)) ?? [];
@@ -858,7 +885,7 @@ export const BulkImportsApi = {
     let matched = 0;
     for (const r of rows) {
       const { mapped } = mapRow(r.raw as Record<string, unknown>, mapping);
-      if ([mapped.photo_hint, mapped.enrollment_no].some((k) => k && photos.has(normStem(String(k))))) matched++;
+      if (photoFor(photos, mapped)) matched++;
     }
     return { photos_uploaded: photos.size, photos_matched: matched };
   },

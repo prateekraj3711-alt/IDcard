@@ -35,14 +35,20 @@ async function ensureClass(schoolId: string, name: string): Promise<string> {
 /** Assign (or clear) the class a user may see and add candidates for. */
 export const setAccountClass = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((d) => z.object({ user_id: z.string().uuid(), class_name: z.string().trim().max(50) }).parse(d))
+  .inputValidator((d) => z.object({
+    user_id: z.string().uuid(), class_name: z.string().trim().max(50),
+    school_id: z.string().uuid().nullish(),
+  }).parse(d))
   .handler(async ({ data, context }) => {
     await assertSuperAdmin(context as unknown as Ctx);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { data: p } = await supabaseAdmin.from("profiles").select("school_id").eq("id", data.user_id).single();
-    if (data.class_name && !p?.school_id) throw new Error("Assign the user to an organization first.");
-    const class_id = data.class_name ? await ensureClass(p!.school_id!, data.class_name) : null;
-    const { error } = await supabaseAdmin.from("profiles").update({ class_id }).eq("id", data.user_id);
+    const school_id = data.school_id !== undefined ? data.school_id : p?.school_id ?? null;
+    if (data.class_name && !school_id) throw new Error("Assign the user to an organization first.");
+    const class_id = data.class_name ? await ensureClass(school_id!, data.class_name) : null;
+    const patch: { class_id: string | null; school_id?: string | null; entry_fields?: null } = { class_id };
+    if (school_id !== (p?.school_id ?? null)) { patch.school_id = school_id; patch.entry_fields = null; }
+    const { error } = await supabaseAdmin.from("profiles").update(patch).eq("id", data.user_id);
     if (error) throw new Error(error.message);
     return { ok: true };
   });

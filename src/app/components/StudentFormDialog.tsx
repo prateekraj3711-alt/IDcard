@@ -13,6 +13,7 @@ import { DATE_EXTRA_KEYS, ENTRY_FIELDS, parseEntryFields } from '@/app/entryFiel
 
 const EXTRA_FIELDS: Array<[string, string]> = ENTRY_FIELDS.filter((f) => f.key.startsWith('extra.')).map((f) => [f.key.slice(6), f.label]);
 const EXTRA_LABEL: Record<string, string> = Object.fromEntries(EXTRA_FIELDS);
+const BLOOD_GROUPS = ['A+', 'B+', 'O+', 'AB+', 'A-', 'B-', 'O-', 'AB-'];
 
 /** Keep only digits, drop +91 / 91 / leading 0 prefixes, cap at 10 digits. */
 function normalizeMobile(raw: string): string {
@@ -34,6 +35,7 @@ export function StudentFormDialog({
     enrollment_no: '', name: '', roll_no: '',
     father_name: '', mother_name: '', dob: '',
     blood_group: '', gender: null, mobile: '',
+    enrolled_on: new Date().toISOString().slice(0, 10),
     address: '', status: 'active',
     class_name: user?.class?.name ?? '', section_name: '',
     extra: {} as Record<string, string>,
@@ -42,6 +44,7 @@ export function StudentFormDialog({
     school_id: student.school_id,
     enrollment_no: student.enrollment_no, name: student.name, roll_no: student.roll_no ?? '',
     father_name: student.father_name ?? '', mother_name: student.mother_name ?? '', dob: student.dob ?? '',
+    enrolled_on: student.enrolled_on ?? '',
     blood_group: student.blood_group ?? '', gender: student.gender ?? null, mobile: student.mobile ?? '',
     address: student.address ?? '', status: student.status ?? 'active',
     class_name: student.class_name ?? '', section_name: student.section_name ?? '',
@@ -76,11 +79,13 @@ export function StudentFormDialog({
   const config = isAdmin ? null : (myFields ?? parseEntryFields(school?.entry_fields));
   const ask = (key: string) => key === 'name' || !config || config.includes(key);
   const configExtras = (config ?? []).filter((k) => k.startsWith('extra.')).map((k) => k.slice(6));
+  // Class/section already have their own box — never show a second one from custom details.
+  const isClassKey = (k: string) => /^(class|classgroup|class_group|group|section|class_name|section_name)$/i.test(k.replace(/[\s/-]+/g, '_'));
   const extraKeys = Array.from(new Set([
     ...EXTRA_FIELDS.map(([k]) => k).filter((k) => ask('extra.' + k)),
     ...configExtras,
     ...(isAdmin ? Object.keys(form.extra ?? {}) : []),
-  ]));
+  ])).filter((k) => !isClassKey(k));
   const enrollmentRequired = ask('enrollment_no');
 
   const save = useMutation({
@@ -173,7 +178,20 @@ export function StudentFormDialog({
               <DateTextField fullWidth label="Date of birth" value={form.dob ?? ''} onChange={(v) => set('dob', v)} />
             </Grid>
           )}
-          {field('blood_group', 'Blood group', 3, { inputProps: { maxLength: 5 } })}
+          {ask('enrolled_on') && (
+            <Grid item xs={12} sm={3}>
+              <DateTextField fullWidth label="Enrollment date" value={form.enrolled_on ?? ''} onChange={(v) => set('enrolled_on', v)} />
+            </Grid>
+          )}
+          {ask('blood_group') && (
+            <Grid item xs={12} sm={3}>
+              <TextField select fullWidth label="Blood group" value={form.blood_group ?? ''} onChange={(e) => set('blood_group', e.target.value)}>
+                <MenuItem value="">—</MenuItem>
+                {BLOOD_GROUPS.map((b) => <MenuItem key={b} value={b}>{b}</MenuItem>)}
+                {form.blood_group && !BLOOD_GROUPS.includes(form.blood_group) && <MenuItem value={form.blood_group}>{form.blood_group}</MenuItem>}
+              </TextField>
+            </Grid>
+          )}
           {ask('gender') && (
             <Grid item xs={12} sm={3}>
               <TextField select fullWidth label="Gender" value={form.gender ?? ''} onChange={(e) => set('gender', e.target.value || null)}>

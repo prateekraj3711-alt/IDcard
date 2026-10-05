@@ -93,11 +93,11 @@ export function StudentsPage() {
             {(schools?.items ?? []).map((s) => <MenuItem key={s.id} value={s.id}>{s.code} — {s.name}</MenuItem>)}
           </TextField>
         )}
-        <TextField select size="small" label="Class" value={classId} disabled={!effectiveSchool} sx={{ minWidth: 140, background: 'white' }}
+        {!user?.class && <TextField select size="small" label="Class" value={classId} disabled={!effectiveSchool} sx={{ minWidth: 140, background: 'white' }}
           onChange={(e) => { setClassId(e.target.value); setPage(0); }}>
           <MenuItem value="">All classes</MenuItem>
           {(classes ?? []).map((c) => <MenuItem key={c.id} value={c.id}>{c.name}</MenuItem>)}
-        </TextField>
+        </TextField>}
         <TextField select size="small" label="Status" value={status} sx={{ minWidth: 140, background: 'white' }}
           onChange={(e) => { setStatus(e.target.value); setPage(0); }}>
           <MenuItem value="">Any status</MenuItem>

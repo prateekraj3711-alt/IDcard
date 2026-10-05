@@ -219,7 +219,7 @@ export function StudentProfilePage() {
               <DetailRow label="Gender" value={student.gender} />
               <DetailRow label="Mobile" value={student.mobile} />
               <DetailRow label="Address" value={student.address} />
-              <DetailRow label="Enrolled On" value={student.enrolled_on} />
+              <DetailRow label="Enrolled On" value={student.enrolled_on ? student.enrolled_on.slice(0, 10).split("-").reverse().join("/") : null} />
               {Object.entries(student.extra ?? {}).map(([k, v]) => (
                 <DetailRow key={k} label={k.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())} value={v || null} />
               ))}

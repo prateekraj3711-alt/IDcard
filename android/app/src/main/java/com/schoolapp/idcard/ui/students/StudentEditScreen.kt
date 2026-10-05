@@ -217,11 +217,15 @@ fun StudentEditScreen(
                 Spacer(Modifier.height(8.dp))
             }
             if (state.ask("dob")) {
-                OutlinedTextField(state.dob ?: "", vm::onDob, label = { Text("Date of birth (YYYY-MM-DD)") }, modifier = Modifier.fillMaxWidth())
+                DmyDateField(state.dob, vm::onDob, "Date of birth")
                 Spacer(Modifier.height(8.dp))
             }
             if (state.ask("blood_group")) {
-                OutlinedTextField(state.bloodGroup ?: "", vm::onBloodGroup, label = { Text("Blood Group") }, modifier = Modifier.fillMaxWidth())
+                BloodGroupField(state.bloodGroup, vm::onBloodGroup)
+                Spacer(Modifier.height(8.dp))
+            }
+            if (state.ask("enrolled_on")) {
+                DmyDateField(state.enrolledOn, vm::onEnrolledOn, "Enrollment date")
                 Spacer(Modifier.height(8.dp))
             }
 
@@ -297,4 +301,58 @@ fun StudentEditScreen(
             Spacer(Modifier.height(24.dp))
         }
     }
+}
+
+
+private val BLOOD_GROUPS = listOf("A+", "B+", "O+", "AB+", "A-", "B-", "O-", "AB-")
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun BloodGroupField(value: String?, onChange: (String) -> Unit) {
+    var open by remember { mutableStateOf(false) }
+    val options = if (!value.isNullOrBlank() && value !in BLOOD_GROUPS) BLOOD_GROUPS + value else BLOOD_GROUPS
+    ExposedDropdownMenuBox(expanded = open, onExpandedChange = { open = it }) {
+        OutlinedTextField(
+            value = value ?: "", onValueChange = {}, readOnly = true, label = { Text("Blood Group") },
+            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = open) },
+            modifier = Modifier.menuAnchor().fillMaxWidth(),
+        )
+        ExposedDropdownMenu(expanded = open, onDismissRequest = { open = false }) {
+            DropdownMenuItem(text = { Text("—") }, onClick = { onChange(""); open = false })
+            options.forEach { b -> DropdownMenuItem(text = { Text(b) }, onClick = { onChange(b); open = false }) }
+        }
+    }
+}
+
+/** Typed DD/MM/YYYY with automatic slashes; emits ISO yyyy-MM-dd when valid, "" when empty. */
+@Composable
+private fun DmyDateField(iso: String?, onChange: (String) -> Unit, label: String) {
+    fun toDisplay(v: String?): String {
+        val m = Regex("^(\\d{4})-(\\d{2})-(\\d{2})").find(v ?: "") ?: return v ?: ""
+        return "${m.groupValues[3]}/${m.groupValues[2]}/${m.groupValues[1]}"
+    }
+    var text by remember { mutableStateOf(toDisplay(iso)) }
+    fun toIso(t: String): String? {
+        val m = Regex("^(\\d{2})/(\\d{2})/(\\d{4})$").find(t) ?: return null
+        return runCatching {
+            java.time.LocalDate.of(m.groupValues[3].toInt(), m.groupValues[2].toInt(), m.groupValues[1].toInt()).toString()
+        }.getOrNull()
+    }
+    val bad = text.isNotEmpty() && toIso(text) == null
+    OutlinedTextField(
+        value = text,
+        onValueChange = { raw ->
+            val d = raw.filter { it.isDigit() }.take(8)
+            var out = listOf(d.take(2), d.drop(2).take(2), d.drop(4)).filter { it.isNotEmpty() }.joinToString("/")
+            if (d.length == 2 || d.length == 4) out += "/"
+            if (raw.length < text.length && text.endsWith("/") && out == text) out = out.dropLast(2)
+            text = out
+            val v = toIso(out)
+            if (v != null) onChange(v) else if (out.isEmpty()) onChange("")
+        },
+        label = { Text(label) }, placeholder = { Text("DD/MM/YYYY") },
+        isError = bad, supportingText = if (bad) ({ Text("Type the date as DD/MM/YYYY") }) else null,
+        keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = androidx.compose.ui.text.input.KeyboardType.Number),
+        modifier = Modifier.fillMaxWidth(),
+    )
 }

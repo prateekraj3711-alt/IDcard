@@ -79,7 +79,7 @@ export function TeachersPage() {
       field: 'actions', headerName: '', width: 150, sortable: false,
       renderCell: (p) => (
         <>
-        <Tooltip title="Change class">
+        <Tooltip title="Change organization or class">
           <IconButton size="small" onClick={() => setClassFor({ id: p.row.id, schoolId: p.row.school?.id, name: p.row.class?.name ?? '' })}>
             <EditIcon fontSize="small" />
           </IconButton>
@@ -312,27 +312,35 @@ function AddTeacherDialog({
 function ClassDialog({ target, onClose }: { target: { id: string; schoolId?: string; name: string }; onClose: () => void }) {
   const qc = useQueryClient();
   const [name, setName] = useState(target.name);
-  const { data: classes } = useQuery({ queryKey: ['classes', target.schoolId], queryFn: () => ClassesApi.list(target.schoolId!), enabled: !!target.schoolId });
+  const [schoolId, setSchoolId] = useState(target.schoolId ?? '');
+  const { data: schools } = useQuery({ queryKey: ['schools', 'select'], queryFn: () => SchoolsApi.list({ page: 1, page_size: 200 }) });
+  const { data: classes } = useQuery({ queryKey: ['classes', schoolId], queryFn: () => ClassesApi.list(schoolId), enabled: !!schoolId });
   const save = useMutation({
-    mutationFn: () => TeachersApi.setClass(target.id, name.trim()),
+    mutationFn: () => TeachersApi.setClass(target.id, schoolId ? name.trim() : '', schoolId || null),
     onSuccess: () => { qc.invalidateQueries({ queryKey: ['teachers'] }); onClose(); },
   });
   return (
     <Dialog open onClose={onClose} fullWidth maxWidth="xs">
-      <DialogTitle>Assign class</DialogTitle>
+      <DialogTitle>Organization & class</DialogTitle>
       <DialogContent>
-        {!target.schoolId ? <Alert severity="info" sx={{ mt: 1 }}>This user has no organization, so a class can't be set.</Alert> : (
+        <TextField select fullWidth sx={{ mt: 1 }} label="Organization" value={schoolId}
+          onChange={(e) => { setSchoolId(e.target.value); if (e.target.value !== target.schoolId) setName(''); }}>
+          <MenuItem value=""><em>None</em></MenuItem>
+          {(schools?.items ?? []).map((s) => <MenuItem key={s.id} value={s.id}>{s.code} — {s.name}</MenuItem>)}
+        </TextField>
+        {schoolId && (
           <>
-            <TextField fullWidth sx={{ mt: 1 }} label="Class" value={name} onChange={(e) => setName(e.target.value)}
+            <TextField fullWidth sx={{ mt: 2 }} label="Class" value={name} onChange={(e) => setName(e.target.value)}
               inputProps={{ list: 'assign-class-options', maxLength: 50 }} helperText="Leave blank to allow all classes" />
             <datalist id="assign-class-options">{(classes ?? []).map((c) => <option key={c.id} value={c.name} />)}</datalist>
           </>
         )}
+        {schoolId !== (target.schoolId ?? '') && <Alert severity="info" sx={{ mt: 2 }}>Changing organization resets this user's detail list to the new organization's.</Alert>}
         {save.isError && <Alert severity="error" sx={{ mt: 2 }}>{friendlyError(save.error, 'Could not save')}</Alert>}
       </DialogContent>
       <DialogActions>
         <Button onClick={onClose}>Cancel</Button>
-        <Button variant="contained" disabled={!target.schoolId || save.isPending} onClick={() => save.mutate()}>Save</Button>
+        <Button variant="contained" disabled={save.isPending} onClick={() => save.mutate()}>Save</Button>
       </DialogActions>
     </Dialog>
   );

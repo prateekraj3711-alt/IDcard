@@ -30,6 +30,7 @@ data class StudentEditUiState(
     val motherName: String? = null,
     val dob: String? = null,
     val bloodGroup: String? = null,
+    val enrolledOn: String? = java.time.LocalDate.now().toString(),
     val mobile: String? = null,
     val address: String? = null,
     val hasPhoto: Boolean = false,
@@ -112,6 +113,7 @@ class StudentEditViewModel @Inject constructor(
                     motherName = row.motherName,
                     dob = row.dob,
                     bloodGroup = row.bloodGroup,
+                    enrolledOn = row.enrolledOn,
                     mobile = row.mobile,
                     address = row.address,
                     gender = row.gender,
@@ -152,6 +154,7 @@ class StudentEditViewModel @Inject constructor(
     fun onMotherName(v: String) = _state.update { it.copy(motherName = v) }
     fun onDob(v: String) = _state.update { it.copy(dob = v) }
     fun onBloodGroup(v: String) = _state.update { it.copy(bloodGroup = v) }
+    fun onEnrolledOn(v: String) = _state.update { it.copy(enrolledOn = v) }
     fun onMobile(v: String) = _state.update { it.copy(mobile = normalizeMobile(v)) }
     fun onAddress(v: String) = _state.update { it.copy(address = v) }
     fun onGender(v: String?) = _state.update { it.copy(gender = v) }
@@ -197,6 +200,7 @@ class StudentEditViewModel @Inject constructor(
                         motherName = s.motherName,
                         dob = s.dob,
                         bloodGroup = s.bloodGroup,
+                        enrolledOn = s.enrolledOn?.takeIf { it.isNotBlank() },
                         mobile = mobile,
                         address = s.address,
                         gender = s.gender,
