@@ -19,6 +19,7 @@ import { CameraCaptureDialog } from '@/app/components/CameraCaptureDialog';
 import type { IdCard } from '@/app/types';
 import { useAuth } from '@/app/auth/store';
 import { Watermark } from '@/app/components/Watermark';
+import { ExportMenu } from '@/app/components/ExportMenu';
 
 const PHOTO_STAGE: Record<string, string> = {
   processing: 'Resizing & compressing photo…', checking: 'Checking for duplicates…',
@@ -116,6 +117,7 @@ export function StudentProfilePage() {
       <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 2 }}>
         <Typography variant="h4" sx={{ flexGrow: 1 }}>{student.name}</Typography>
         <Button startIcon={<EditIcon />} onClick={() => setEditing(true)}>Edit</Button>
+        {isAdmin && id && <ExportMenu scope={{ ids: [id] }} label="Export" filename="candidate" size="medium" />}
         {isAdmin && <Button color="error" startIcon={<DeleteIcon />} onClick={() => setConfirmDelete(true)}>Delete</Button>}
       </Stack>
       <Grid container spacing={2}>
@@ -146,7 +148,17 @@ export function StudentProfilePage() {
                   </Box>
                 )}
                 {upload.isError && <Alert severity="error" sx={{ width: '100%' }}>{friendlyError(upload.error, 'Photo upload failed')}</Alert>}
-                {upload.isSuccess && !photoStage && <Alert severity="success" sx={{ width: '100%' }}>Photo saved.</Alert>}
+                {upload.isSuccess && !photoStage && (
+                  <Alert severity="success" sx={{ width: '100%' }}
+                    action={
+                      <Stack direction="row" spacing={1}>
+                        <Button size="small" onClick={() => nav('/students')}>Done</Button>
+                        <Button size="small" variant="contained" onClick={() => nav('/students', { search: { new: 1 } })}>Add next</Button>
+                      </Stack>
+                    }>
+                    Photo saved.
+                  </Alert>
+                )}
                 <Typography variant="caption" color="text.secondary">JPG/PNG/WEBP · saved as 720×960 JPEG (~300 KB)</Typography>
                 <QRCode value={qrPayload} size={120} />
               </Stack>
