@@ -6,6 +6,7 @@ import android.content.pm.PackageManager
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.camera.core.Camera
 import androidx.camera.core.CameraSelector
 import androidx.camera.core.ImageCapture
 import androidx.camera.core.ImageCaptureException
@@ -13,6 +14,8 @@ import androidx.camera.core.Preview
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.view.PreviewView
 import androidx.compose.foundation.background
+import androidx.compose.foundation.gestures.detectTransformGestures
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CameraAlt
@@ -53,6 +56,12 @@ fun CameraCaptureScreen(
     // Toggle switches between back and front for selfie enrollment.
     var useFrontCamera by remember { mutableStateOf(false) }
     val state by vm.state.collectAsState()
+    var camera by remember { mutableStateOf<Camera?>(null) }
+    var zoom by remember { mutableFloatStateOf(1f) }
+    val boundFront = remember { booleanArrayOf(false) }
+    val maxZoom = camera?.cameraInfo?.zoomState?.value?.maxZoomRatio ?: 4f
+    val minZoom = camera?.cameraInfo?.zoomState?.value?.minZoomRatio ?: 1f
+    LaunchedEffect(zoom, camera) { camera?.cameraControl?.setZoomRatio(zoom.coerceIn(minZoom, maxZoom)) }
 
     // Runtime CAMERA permission. Declared in the manifest but Android 6+
     // still requires the user to grant it at runtime — without this the
@@ -102,15 +111,22 @@ fun CameraCaptureScreen(
             AndroidView(
                 factory = { ctx ->
                     PreviewView(ctx).also { preview ->
-                        bindCamera(ctx, lifecycleOwner, preview, imageCapture, useFrontCamera)
+                        boundFront[0] = useFrontCamera
+                        bindCamera(ctx, lifecycleOwner, preview, imageCapture, useFrontCamera) { camera = it; zoom = 1f }
                     }
                 },
                 update = { preview ->
                     // Re-bind whenever the selected lens flips; ProcessCameraProvider
                     // is a singleton so this is cheap.
-                    bindCamera(preview.context, lifecycleOwner, preview, imageCapture, useFrontCamera)
+                    if (boundFront[0] != useFrontCamera) {
+                        boundFront[0] = useFrontCamera
+                        bindCamera(preview.context, lifecycleOwner, preview, imageCapture, useFrontCamera) { camera = it; zoom = 1f }
+                    }
                 },
-                modifier = Modifier.fillMaxSize(),
+                modifier = Modifier.fillMaxSize().pointerInput(Unit) {
+                    // Pinch to zoom.
+                    detectTransformGestures { _, _, scale, _ -> zoom = (zoom * scale).coerceIn(1f, 10f) }
+                },
             )
             // Flip-camera pill top-right.
             IconButton(
@@ -132,6 +148,17 @@ fun CameraCaptureScreen(
                     else "Frame the candidate's face in the centre",
                     color = Color.White,
                     style = MaterialTheme.typography.bodyMedium,
+                )
+                Text(
+                    "Zoom %.1fx · pinch or slide. Face is auto-cropped on a white background.".format(zoom.coerceIn(minZoom, maxZoom)),
+                    color = Color.White,
+                    style = MaterialTheme.typography.bodySmall,
+                )
+                Slider(
+                    value = zoom.coerceIn(minZoom, maxZoom),
+                    onValueChange = { zoom = it },
+                    valueRange = minZoom..maxZoom.coerceAtLeast(minZoom + 0.1f),
+                    modifier = Modifier.fillMaxWidth(0.8f),
                 )
                 Spacer(Modifier.height(12.dp))
                 Button(
@@ -202,6 +229,7 @@ private fun bindCamera(
     preview: PreviewView,
     imageCapture: ImageCapture,
     useFrontCamera: Boolean = false,
+    onBound: (Camera) -> Unit = {},
 ) {
     val future = ProcessCameraProvider.getInstance(ctx)
     future.addListener({
@@ -211,16 +239,16 @@ private fun bindCamera(
         else CameraSelector.DEFAULT_BACK_CAMERA
         provider.unbindAll()
         try {
-            provider.bindToLifecycle(owner, selector, previewUseCase, imageCapture)
+            onBound(provider.bindToLifecycle(owner, selector, previewUseCase, imageCapture))
         } catch (_: Exception) {
             // Some devices don't expose a front camera — fall back to whichever
             // is available so we never leave the user with a black preview.
-            provider.bindToLifecycle(
+            onBound(provider.bindToLifecycle(
                 owner,
                 CameraSelector.DEFAULT_BACK_CAMERA,
                 previewUseCase,
                 imageCapture,
-            )
+            ))
         }
     }, ContextCompat.getMainExecutor(ctx))
 }
