@@ -6,6 +6,11 @@ import com.schoolapp.idcard.data.remote.TokenStore
 import com.schoolapp.idcard.data.remote.dto.LoginRequestDto
 import com.schoolapp.idcard.data.remote.dto.TeacherSignupRequestDto
 import com.schoolapp.idcard.data.remote.dto.UserDto
+import android.content.Context
+import com.schoolapp.idcard.data.local.AppDatabase
+import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -13,7 +18,18 @@ import javax.inject.Singleton
 class AuthRepository @Inject constructor(
     private val api: ApiService,
     private val tokens: TokenStore,
+    private val db: AppDatabase,
+    @ApplicationContext private val context: Context,
 ) {
+    /** Candidates saved on this phone belong to one account: wipe them when a different user signs in. */
+    private suspend fun scopeLocalDataTo(userId: String) = withContext(Dispatchers.IO) {
+        val prefs = context.getSharedPreferences("local_owner", Context.MODE_PRIVATE)
+        if (prefs.getString("user_id", null) != userId) {
+            db.clearAllTables()
+            prefs.edit().putString("user_id", userId).apply()
+        }
+    }
+
     val isLoggedIn: Boolean get() = tokens.hasSession()
     val currentSession: SessionInfo? get() = tokens.session()
 
@@ -54,6 +70,7 @@ class AuthRepository @Inject constructor(
                 device_id = deviceId,
             )
         )
+        scopeLocalDataTo(resp.user.id)
         tokens.save(resp.access_token, resp.refresh_token)
         tokens.saveSession(resp.user.toSession())
         return resp.user
@@ -77,6 +94,7 @@ class AuthRepository @Inject constructor(
                 device_id = deviceId,
             )
         )
+        scopeLocalDataTo(resp.user.id)
         tokens.save(resp.access_token, resp.refresh_token)
         tokens.saveSession(resp.user.toSession())
         return resp.user
