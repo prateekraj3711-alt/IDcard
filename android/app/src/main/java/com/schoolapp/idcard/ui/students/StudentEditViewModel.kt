@@ -152,7 +152,7 @@ class StudentEditViewModel @Inject constructor(
     fun onMotherName(v: String) = _state.update { it.copy(motherName = v) }
     fun onDob(v: String) = _state.update { it.copy(dob = v) }
     fun onBloodGroup(v: String) = _state.update { it.copy(bloodGroup = v) }
-    fun onMobile(v: String) = _state.update { it.copy(mobile = v) }
+    fun onMobile(v: String) = _state.update { it.copy(mobile = normalizeMobile(v)) }
     fun onAddress(v: String) = _state.update { it.copy(address = v) }
     fun onGender(v: String?) = _state.update { it.copy(gender = v) }
     fun onExtra(k: String, v: String) = _state.update { it.copy(extra = it.extra + (k to v)) }
@@ -172,9 +172,11 @@ class StudentEditViewModel @Inject constructor(
 
     fun save(submit: Boolean, onDone: () -> Unit) {
         val s = _state.value
+        val mobile = normalizeMobile(s.mobile ?: "")
         val validation = when {
             s.schoolId.isBlank() -> "Pick a school for this candidate"
             s.name.isBlank() -> "Full name is required"
+            mobile.isNotEmpty() && mobile.length != 10 -> "Mobile number must be exactly 10 digits"
             else -> null
         }
         if (validation != null) {
@@ -195,7 +197,7 @@ class StudentEditViewModel @Inject constructor(
                         motherName = s.motherName,
                         dob = s.dob,
                         bloodGroup = s.bloodGroup,
-                        mobile = s.mobile,
+                        mobile = mobile,
                         address = s.address,
                         gender = s.gender,
                         localPhotoPath = s.photoPath,
@@ -210,8 +212,17 @@ class StudentEditViewModel @Inject constructor(
             } catch (t: Throwable) {
                 _state.update {
                     it.copy(saving = false, error = t.message ?: "Save failed")
-                }
             }
         }
     }
+}
+
+/** Keep only digits, drop +91 / 91 / leading 0 prefixes, cap at 10 digits. */
+private fun normalizeMobile(raw: String): String {
+    var d = raw.filter { it.isDigit() }
+    if (d.length > 10 && d.startsWith("91")) d = d.drop(2)
+    d = d.trimStart('0')
+    if (d.length > 10 && d.startsWith("91")) d = d.drop(2)
+    return d.take(10)
+}
 }
