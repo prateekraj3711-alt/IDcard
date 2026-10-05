@@ -61,6 +61,7 @@ export default defineConfig({
         "react-konva",
         "use-image",
         "xlsx",
+        "@mediapipe/tasks-vision",
         "zustand",
       ],
     },
