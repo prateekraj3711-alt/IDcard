@@ -117,6 +117,7 @@ dependencies {
 
     // MLKit face detection (optional, used for framing hint)
     implementation("com.google.mlkit:face-detection:16.1.6")
+    implementation("com.google.mlkit:segmentation-selfie:16.0.0-beta6")
 
     // Tests
     testImplementation("junit:junit:4.13.2")
