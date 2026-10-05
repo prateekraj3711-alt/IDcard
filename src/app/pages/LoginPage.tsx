@@ -1,19 +1,10 @@
-import { useEffect, useMemo, useState, type FormEvent } from 'react';
+import { useEffect, useState, type FormEvent } from 'react';
 import { Alert, Box, Button, Card, CardContent, Stack, Tab, Tabs, TextField, Typography } from '@mui/material';
 import { useNavigate } from '@/app/router-shim';
 import { supabase } from '@/integrations/supabase/client';
 import { loadCurrentUser } from '@/app/auth/store';
 import { BRAND_NAME, APP_TAGLINE } from '@/app/theme';
 
-
-function greeting(): string {
-  const h = new Date().getHours();
-  if (h < 5) return 'Good night';
-  if (h < 12) return 'Good morning';
-  if (h < 17) return 'Good afternoon';
-  if (h < 21) return 'Good evening';
-  return 'Good night';
-}
 
 export function LoginPage() {
   const [identifier, setIdentifier] = useState('');
@@ -28,7 +19,6 @@ export function LoginPage() {
   useEffect(() => {
     fetch('/api/public/auth/bootstrap').then((r) => r.json()).then((d) => setNeedsSetup(!!d.needs_setup)).catch(() => {});
   }, []);
-  const hello = useMemo(() => `${greeting()} — welcome to ${BRAND_NAME}`, []);
 
   const submit = async (e: FormEvent) => {
     e.preventDefault();
@@ -104,7 +94,7 @@ export function LoginPage() {
         <Card sx={{ p: 1 }}>
           <CardContent>
             <Typography variant="h5" sx={{ fontWeight: 700, mb: 0.5 }}>
-              {hello}!
+              Secure access portal
             </Typography>
             <Typography variant="body2" sx={{ mb: 2 }}>
               Sign in to manage organizations, users, candidates and ID cards.

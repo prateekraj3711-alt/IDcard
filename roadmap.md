@@ -18,4 +18,4 @@
 - [x] Android: phone only shows candidates of the signed-in user (clear local data on user switch)
 - [x] Camera zoom + auto passport crop + white background (web + Android)
 - [x] Super admin export candidates to XLSX/CSV (selected orgs / selected candidates / single)
-- [x] Rename branding to B&S Group (web + Android)
+- [x] Rename branding to Tirhut-Tech Bhardwaj - A Unit of B&S Group (web + Android)

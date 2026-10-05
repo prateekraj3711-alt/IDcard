@@ -1,6 +1,6 @@
 import { Box } from '@mui/material';
 
-/** View-only ID card preview with a repeated B&S GROUP watermark; blocks save/drag/right-click. */
+/** View-only ID card preview with a repeated TIRHUT-TECH BHARDWAJ · A UNIT OF B&S GROUP watermark; blocks save/drag/right-click. */
 export function Watermark({ src, kind = 'image' }: { src: string; kind?: 'image' | 'pdf' }) {
   const block = (e: React.SyntheticEvent) => e.preventDefault();
   return (
@@ -23,7 +23,7 @@ export function Watermark({ src, kind = 'image' }: { src: string; kind?: 'image'
         {Array.from({ length: 40 }).map((_, i) => (
           <Box key={i} component="span" sx={{
             fontWeight: 800, fontSize: { xs: 16, sm: 22 }, letterSpacing: 2, color: 'error.main', opacity: 0.35, p: 2, whiteSpace: 'nowrap',
-          }}>B&S GROUP</Box>
+          }}>TIRHUT-TECH BHARDWAJ · A UNIT OF B&S GROUP</Box>
         ))}
       </Box>
     </Box>

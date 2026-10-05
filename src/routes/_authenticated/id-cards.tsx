@@ -9,10 +9,10 @@ export const Route = createFileRoute("/_authenticated/id-cards")({
   },
   head: () => ({
     meta: [
-      { title: "ID Cards — B&S Group ID" },
-      { name: "description", content: "ID Cards in the B&S Group ID candidate ID card platform." },
-      { property: "og:title", content: "ID Cards — B&S Group ID" },
-      { property: "og:description", content: "ID Cards in the B&S Group ID candidate ID card platform." },
+      { title: "ID Cards — Tirhut-Tech Bhardwaj ID" },
+      { name: "description", content: "ID Cards in the Tirhut-Tech Bhardwaj ID candidate ID card platform." },
+      { property: "og:title", content: "ID Cards — Tirhut-Tech Bhardwaj ID" },
+      { property: "og:description", content: "ID Cards in the Tirhut-Tech Bhardwaj ID candidate ID card platform." },
     ],
   }),
   component: IdCardsPage,

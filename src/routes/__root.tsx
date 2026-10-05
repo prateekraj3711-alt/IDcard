@@ -80,9 +80,9 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: "B&S Group ID — Candidate ID Card Platform" },
+      { title: "Tirhut-Tech Bhardwaj ID — Candidate ID Card Platform" },
       { name: "description", content: "Enroll candidates, capture photos and generate print-ready ID cards." },
-      { property: "og:title", content: "B&S Group ID — Candidate ID Card Platform" },
+      { property: "og:title", content: "Tirhut-Tech Bhardwaj ID — Candidate ID Card Platform" },
       { property: "og:description", content: "Enroll candidates, capture photos and generate print-ready ID cards." },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },

@@ -5,9 +5,9 @@ export const Route = createFileRoute("/login")({
   ssr: false,
   head: () => ({
     meta: [
-      { title: "Sign in — B&S Group ID" },
+      { title: "Sign in — Tirhut-Tech Bhardwaj ID" },
       { name: "description", content: "Sign in to manage organizations, candidates, photos and ID cards." },
-      { property: "og:title", content: "Sign in — B&S Group ID" },
+      { property: "og:title", content: "Sign in — Tirhut-Tech Bhardwaj ID" },
       { property: "og:description", content: "Sign in to manage organizations, candidates, photos and ID cards." },
     ],
   }),

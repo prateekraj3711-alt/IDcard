@@ -9,10 +9,10 @@ export const Route = createFileRoute("/_authenticated/dashboard")({
   },
   head: () => ({
     meta: [
-      { title: "Dashboard — B&S Group ID" },
-      { name: "description", content: "Dashboard in the B&S Group ID candidate ID card platform." },
-      { property: "og:title", content: "Dashboard — B&S Group ID" },
-      { property: "og:description", content: "Dashboard in the B&S Group ID candidate ID card platform." },
+      { title: "Dashboard — Tirhut-Tech Bhardwaj ID" },
+      { name: "description", content: "Dashboard in the Tirhut-Tech Bhardwaj ID candidate ID card platform." },
+      { property: "og:title", content: "Dashboard — Tirhut-Tech Bhardwaj ID" },
+      { property: "og:description", content: "Dashboard in the Tirhut-Tech Bhardwaj ID candidate ID card platform." },
     ],
   }),
   component: DashboardPage,

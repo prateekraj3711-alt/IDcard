@@ -94,5 +94,5 @@ export const theme = createTheme({
   },
 });
 
-export const BRAND_NAME = 'B&S Group';
+export const BRAND_NAME = 'Tirhut-Tech Bhardwaj - A Unit of B&S Group';
 export const APP_TAGLINE = 'Student & Employee ID Platform';

@@ -15,7 +15,7 @@ import PrintIcon from '@mui/icons-material/Print';
 import LogoutIcon from '@mui/icons-material/Logout';
 import MenuIcon from '@mui/icons-material/Menu';
 import { Link, Outlet, useLocation, useNavigate } from '@/app/router-shim';
-import { useMemo, useState } from 'react';
+import { useState } from 'react';
 import { useAuth } from '@/app/auth/store';
 import { BRAND_NAME } from '@/app/theme';
 
@@ -53,25 +53,6 @@ const nav = [
   },
 ];
 
-function buildGreeting(firstName: string): string {
-  const hour = new Date().getHours();
-  const timeOfDay =
-    hour < 5 ? 'Good night' :
-    hour < 12 ? 'Good morning' :
-    hour < 17 ? 'Good afternoon' :
-    hour < 21 ? 'Good evening' :
-    'Good night';
-
-  const KEY = 'lastSeen';
-  const now = Date.now();
-  const lastSeen = Number(localStorage.getItem(KEY) || 0);
-  const absentHours = lastSeen === 0 ? Infinity : (now - lastSeen) / 36e5;
-  localStorage.setItem(KEY, String(now));
-
-  if (absentHours >= 72) return `Welcome back, ${firstName} — ${timeOfDay}!`;
-  return `Hi, ${firstName}! ${timeOfDay}.`;
-}
-
 export function AppShell() {
   const loc = useLocation();
   const nav_ = useNavigate();
@@ -79,7 +60,6 @@ export function AppShell() {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [menuAnchor, setMenuAnchor] = useState<HTMLElement | null>(null);
   const firstName = (user?.full_name ?? '').split(' ')[0] || 'Admin';
-  const greeting = useMemo(() => buildGreeting(firstName), [firstName]);
 
   const drawerContent = (
       <>
@@ -92,7 +72,7 @@ export function AppShell() {
                 fontSize: 14, fontWeight: 700,
               }}
             >
-              B&S
+              TT
             </Avatar>
             <Box>
               <Typography variant="subtitle1" sx={{ fontWeight: 700, lineHeight: 1 }}>
@@ -176,7 +156,7 @@ export function AppShell() {
             </IconButton>
             <Box sx={{ flexGrow: 1, minWidth: 0 }}>
               <Typography variant="h6" noWrap sx={{ lineHeight: 1.1, fontSize: { xs: 16, md: 20 } }}>
-                {greeting}
+                Operations workspace
               </Typography>
               <Typography variant="caption" color="text.secondary" noWrap component="div">
                 {user?.role === 'super_admin' ? 'Super Admin' : 'User'} · {user?.email}

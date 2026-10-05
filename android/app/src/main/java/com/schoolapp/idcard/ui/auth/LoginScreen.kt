@@ -13,7 +13,6 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.platform.LocalContext
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.schoolapp.idcard.ui.theme.APP_TAGLINE
 import com.schoolapp.idcard.ui.theme.BRAND_NAME
@@ -28,8 +27,7 @@ fun LoginScreen(
 ) {
     val state by vm.state.collectAsState()
     val year = remember { Calendar.getInstance().get(Calendar.YEAR) }
-    val context = LocalContext.current
-    val greeting = remember { buildGreeting(context) }
+    val greeting = remember { buildGreeting() }
 
     Column(
         modifier = Modifier
@@ -52,7 +50,7 @@ fun LoginScreen(
                 contentAlignment = Alignment.Center,
             ) {
                 Text(
-                    "B&S",
+                    "TT",
                     color = MaterialTheme.colorScheme.onPrimary,
                     fontWeight = FontWeight.ExtraBold,
                     style = MaterialTheme.typography.titleMedium,
