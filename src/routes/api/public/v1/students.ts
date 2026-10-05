@@ -26,6 +26,15 @@ export const Route = createFileRoute("/api/public/v1/students")({
         if (!u) return json({ detail: "Not authenticated" }, 401);
         let b: z.infer<typeof Body>;
         try { b = Body.parse(await request.json()); } catch (e) { return json({ detail: "Invalid student data", errors: (e as z.ZodError).issues ?? null }, 422); }
+        // Normalize mobile: digits only, drop +91 / 91 / leading 0, strictly 10 digits.
+        if (b.mobile) {
+          let d = b.mobile.replace(/\D/g, '');
+          if (d.length > 10 && d.startsWith('91')) d = d.slice(2);
+          d = d.replace(/^0+/, '');
+          if (d.length > 10 && d.startsWith('91')) d = d.slice(2);
+          if (d.length !== 10) return json({ detail: 'Mobile number must be exactly 10 digits.' }, 422);
+          b.mobile = d;
+        }
         // Idempotent replay: same client_uuid returns the existing row.
         const existing = await u.client.from("students").select(COLS).eq("client_uuid", b.client_uuid).maybeSingle();
         if (existing.data) return json(existing.data, 200);
