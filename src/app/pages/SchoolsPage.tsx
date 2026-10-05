@@ -15,6 +15,7 @@ import { useAuth } from '@/app/auth/store';
 import type { School } from '@/app/types';
 import { Checkbox, FormGroup } from '@mui/material';
 import { ENTRY_FIELDS, customKey } from '@/app/entryFields';
+import { ExportMenu } from '@/app/components/ExportMenu';
 
 export function SchoolsPage() {
   const qc = useQueryClient();
@@ -66,9 +67,10 @@ export function SchoolsPage() {
         )}
       </Stack>
       {isAdmin && selection.length > 0 && (
-        <Alert severity="info" sx={{ mb: 2 }} action={
+        <Alert severity="info" sx={{ mb: 2 }} action={<Stack direction="row" spacing={1}>
+          <ExportMenu scope={{ schoolIds: selection.map(String) }} label={`Export candidates (${selection.length})`} filename="organization-candidates" />
           <Button color="error" size="small" startIcon={<DeleteIcon />} onClick={() => setConfirmBulk(true)}>Delete selected ({selection.length})</Button>
-        }>{selection.length} organizations selected.</Alert>
+        </Stack>}>{selection.length} organizations selected.</Alert>
       )}
       {error && <Alert severity="error" sx={{ mb: 2 }}>{friendlyError(error, "Couldn't load organizations")}</Alert>}
       <div style={{ height: 600, background: 'white' }}>
