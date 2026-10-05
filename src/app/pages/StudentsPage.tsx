@@ -5,11 +5,12 @@ import DeleteIcon from '@mui/icons-material/DeleteOutline';
 import AddIcon from '@mui/icons-material/Add';
 import PrintIcon from '@mui/icons-material/Print';
 import { DataGrid, GridColDef, GridRowSelectionModel } from '@mui/x-data-grid';
-import { useNavigate } from '@/app/router-shim';
+import { useLocation, useNavigate } from '@/app/router-shim';
 import { ClassesApi, SchoolsApi, StudentsApi } from '@/app/api/endpoints';
 import { friendlyError } from '@/app/media';
 import { useAuth } from '@/app/auth/store';
 import { StudentFormDialog } from '@/app/components/StudentFormDialog';
+import { ExportMenu } from '@/app/components/ExportMenu';
 import type { Student } from '@/app/types';
 
 const columns: GridColDef<Student>[] = [
@@ -33,7 +34,9 @@ export function StudentsPage() {
   const [classId, setClassId] = useState('');
   const [status, setStatus] = useState('');
   const [page, setPage] = useState(0);
-  const [creating, setCreating] = useState(false);
+  const loc = useLocation();
+  // "Add next" on a candidate's page lands here with ?new=1 to open the form straight away.
+  const [creating, setCreating] = useState(() => !!(loc.search as Record<string, unknown> | undefined)?.new);
   const [selection, setSelection] = useState<GridRowSelectionModel>([]);
   const nav = useNavigate();
   const qc = useQueryClient();
@@ -72,7 +75,13 @@ export function StudentsPage() {
     <Box>
       <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 2 }}>
         <Typography variant="h4">Candidates</Typography>
-        <Button variant="contained" startIcon={<AddIcon />} onClick={() => setCreating(true)}>New candidate</Button>
+        <Stack direction="row" spacing={1}>
+          {isSuper && (
+            <ExportMenu size="medium" label={schoolId ? 'Export organization' : 'Export all'}
+              scope={{ schoolIds: schoolId ? [schoolId] : undefined }} filename="candidates" />
+          )}
+          <Button variant="contained" startIcon={<AddIcon />} onClick={() => setCreating(true)}>New candidate</Button>
+        </Stack>
       </Stack>
       <Stack direction={{ xs: 'column', md: 'row' }} spacing={2} sx={{ mb: 2 }}>
         <TextField size="small" placeholder="Search name, enrollment, roll, mobile…" value={q}
@@ -100,6 +109,7 @@ export function StudentsPage() {
           severity={multiSchool ? 'warning' : 'info'}
           sx={{ mb: 2 }}
           action={<Stack direction="row" spacing={1}>
+            <ExportMenu scope={{ ids: selection.map(String) }} label={`Export (${selection.length})`} filename="selected-candidates" />
             <Button color="error" size="small" startIcon={<DeleteIcon />} onClick={() => setConfirmDel(true)}>Delete ({selection.length})</Button>
             {!multiSchool && (
             <Button color="inherit" size="small" startIcon={<PrintIcon />}
