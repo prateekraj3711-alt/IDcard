@@ -15,9 +15,12 @@ function toIso(text: string): string | null {
   return `${y}-${String(mo).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
 }
 function autoSlash(raw: string) {
+  // Always rebuild from digits so slashes appear after day AND month, and deleting works.
   const digits = raw.replace(/\D/g, '').slice(0, 8);
-  if (/[/.-]/.test(raw)) return raw.slice(0, 10);
-  return [digits.slice(0, 2), digits.slice(2, 4), digits.slice(4)].filter(Boolean).join('/');
+  const parts = [digits.slice(0, 2), digits.slice(2, 4), digits.slice(4)].filter(Boolean);
+  let out = parts.join('/');
+  if (digits.length === 2 || digits.length === 4) out += '/';
+  return out;
 }
 
 export function DateTextField({ value, onChange, ...rest }: Omit<TextFieldProps, 'value' | 'onChange'> & { value: string; onChange: (iso: string) => void }) {
