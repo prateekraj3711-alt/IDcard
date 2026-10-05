@@ -69,7 +69,7 @@ private val StarkShapes = Shapes(
     extraLarge = RoundedCornerShape(24.dp),
 )
 
-const val BRAND_NAME = "Stark Industries"
+const val BRAND_NAME = "Tirhut Technologies a Unit of Prateek Group"
 const val APP_TAGLINE = "Student ID Platform"
 
 @Composable

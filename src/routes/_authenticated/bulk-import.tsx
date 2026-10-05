@@ -8,10 +8,10 @@ export const Route = createFileRoute("/_authenticated/bulk-import")({
   },
   head: () => ({
     meta: [
-      { title: "Bulk Generate — Stark Industries ID" },
-      { name: "description", content: "Bulk ID card generation in the Stark Industries ID candidate ID card platform." },
-      { property: "og:title", content: "Bulk Generate — Stark Industries ID" },
-      { property: "og:description", content: "Bulk ID card generation in the Stark Industries ID candidate ID card platform." },
+      { title: "Bulk Generate — Tirhut Technologies ID" },
+      { name: "description", content: "Bulk ID card generation in the Tirhut Technologies ID candidate ID card platform." },
+      { property: "og:title", content: "Bulk Generate — Tirhut Technologies ID" },
+      { property: "og:description", content: "Bulk ID card generation in the Tirhut Technologies ID candidate ID card platform." },
     ],
   }),
   component: BulkImportPage,

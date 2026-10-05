@@ -8,10 +8,10 @@ export const Route = createFileRoute("/_authenticated/templates/")({
   },
   head: () => ({
     meta: [
-      { title: "ID Card Templates — Stark Industries ID" },
-      { name: "description", content: "ID Card Templates in the Stark Industries ID candidate ID card platform." },
-      { property: "og:title", content: "ID Card Templates — Stark Industries ID" },
-      { property: "og:description", content: "ID Card Templates in the Stark Industries ID candidate ID card platform." },
+      { title: "ID Card Templates — Tirhut Technologies ID" },
+      { name: "description", content: "ID Card Templates in the Tirhut Technologies ID candidate ID card platform." },
+      { property: "og:title", content: "ID Card Templates — Tirhut Technologies ID" },
+      { property: "og:description", content: "ID Card Templates in the Tirhut Technologies ID candidate ID card platform." },
     ],
   }),
   component: TemplatesPage,

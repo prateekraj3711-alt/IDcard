@@ -25,7 +25,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 
 /**
- * Reusable top bar carrying the Stark Industries brandmark, a screen title,
+ * Reusable top bar carrying the Tirhut Technologies brandmark, a screen title,
  * and optional back / action slots. Same visual language as the web portal's
  * AppShell header.
  */
@@ -59,7 +59,7 @@ fun BrandTopBar(
                     contentAlignment = Alignment.Center,
                 ) {
                     Text(
-                        "SI",
+                        "TT",
                         color = MaterialTheme.colorScheme.onPrimary,
                         fontWeight = FontWeight.ExtraBold,
                         style = MaterialTheme.typography.bodySmall,

@@ -57,7 +57,7 @@ export function LoginPage() {
         await supabase.auth.signOut();
         throw new Error('This account is not a super admin. Use the User sign-in instead.');
       }
-      nav('/dashboard');
+      nav(me.role === 'super_admin' ? '/dashboard' : '/students');
     } catch (err) {
       const m = (err as Error).message ?? '';
       setError(/fetch|network/i.test(m) ? 'Network problem — check your connection and try again.' : m || 'Login failed — please try again');
@@ -89,7 +89,7 @@ export function LoginPage() {
               fontWeight: 800, fontSize: 16, letterSpacing: 0.5,
             }}
           >
-            SI
+            TT
           </Box>
           <Box>
             <Typography variant="subtitle1" sx={{ fontWeight: 700, lineHeight: 1 }}>

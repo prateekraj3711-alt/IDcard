@@ -52,7 +52,7 @@ fun LoginScreen(
                 contentAlignment = Alignment.Center,
             ) {
                 Text(
-                    "SI",
+                    "TT",
                     color = MaterialTheme.colorScheme.onPrimary,
                     fontWeight = FontWeight.ExtraBold,
                     style = MaterialTheme.typography.titleMedium,

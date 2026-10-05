@@ -24,8 +24,8 @@ const nav = [
   {
     section: 'Overview',
     items: [
-      { to: '/dashboard', label: 'Dashboard', icon: <DashboardIcon /> },
-      { to: '/analytics', label: 'Analytics', icon: <AnalyticsIcon /> },
+      { to: '/dashboard', label: 'Dashboard', icon: <DashboardIcon />, roles: ['super_admin'] as const },
+      { to: '/analytics', label: 'Analytics', icon: <AnalyticsIcon />, roles: ['super_admin'] as const },
     ],
   },
   {
@@ -47,7 +47,7 @@ const nav = [
     section: 'ID Cards',
     items: [
       { to: '/templates', label: 'Templates', icon: <DesignServicesIcon />, roles: ['super_admin'] as const },
-      { to: '/id-cards', label: 'Overview', icon: <CardMembershipIcon /> },
+      { to: '/id-cards', label: 'Overview', icon: <CardMembershipIcon />, roles: ['super_admin'] as const },
       { to: '/generate', label: 'Generate', icon: <PrintIcon />, roles: ['super_admin'] as const },
     ],
   },
@@ -92,7 +92,7 @@ export function AppShell() {
                 fontSize: 14, fontWeight: 700,
               }}
             >
-              SI
+              TT
             </Avatar>
             <Box>
               <Typography variant="subtitle1" sx={{ fontWeight: 700, lineHeight: 1 }}>

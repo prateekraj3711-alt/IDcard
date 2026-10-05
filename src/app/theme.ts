@@ -94,5 +94,5 @@ export const theme = createTheme({
   },
 });
 
-export const BRAND_NAME = 'Stark Industries';
+export const BRAND_NAME = 'Tirhut Technologies a Unit of Prateek Group';
 export const APP_TAGLINE = 'Student & Employee ID Platform';

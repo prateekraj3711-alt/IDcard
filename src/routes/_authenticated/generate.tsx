@@ -18,10 +18,10 @@ export const Route = createFileRoute("/_authenticated/generate")({
   },
   head: () => ({
     meta: [
-      { title: "Generate ID Cards — Stark Industries ID" },
-      { name: "description", content: "Generate ID Cards in the Stark Industries ID candidate ID card platform." },
-      { property: "og:title", content: "Generate ID Cards — Stark Industries ID" },
-      { property: "og:description", content: "Generate ID Cards in the Stark Industries ID candidate ID card platform." },
+      { title: "Generate ID Cards — Tirhut Technologies ID" },
+      { name: "description", content: "Generate ID Cards in the Tirhut Technologies ID candidate ID card platform." },
+      { property: "og:title", content: "Generate ID Cards — Tirhut Technologies ID" },
+      { property: "og:description", content: "Generate ID Cards in the Tirhut Technologies ID candidate ID card platform." },
     ],
   }),
   component: GenerateRoute,

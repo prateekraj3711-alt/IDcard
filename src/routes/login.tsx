@@ -5,9 +5,9 @@ export const Route = createFileRoute("/login")({
   ssr: false,
   head: () => ({
     meta: [
-      { title: "Sign in — Stark Industries ID" },
+      { title: "Sign in — Tirhut Technologies ID" },
       { name: "description", content: "Sign in to manage organizations, candidates, photos and ID cards." },
-      { property: "og:title", content: "Sign in — Stark Industries ID" },
+      { property: "og:title", content: "Sign in — Tirhut Technologies ID" },
       { property: "og:description", content: "Sign in to manage organizations, candidates, photos and ID cards." },
     ],
   }),
