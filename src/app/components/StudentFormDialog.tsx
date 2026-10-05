@@ -14,6 +14,15 @@ import { DATE_EXTRA_KEYS, ENTRY_FIELDS, parseEntryFields } from '@/app/entryFiel
 const EXTRA_FIELDS: Array<[string, string]> = ENTRY_FIELDS.filter((f) => f.key.startsWith('extra.')).map((f) => [f.key.slice(6), f.label]);
 const EXTRA_LABEL: Record<string, string> = Object.fromEntries(EXTRA_FIELDS);
 
+/** Keep only digits, drop +91 / 91 / leading 0 prefixes, cap at 10 digits. */
+function normalizeMobile(raw: string): string {
+  let d = raw.replace(/\D/g, '');
+  if (d.length > 10 && d.startsWith('91')) d = d.slice(2);
+  d = d.replace(/^0+/, '');
+  if (d.length > 10 && d.startsWith('91')) d = d.slice(2);
+  return d.slice(0, 10);
+}
+
 export function StudentFormDialog({
   student, onClose, onSaved,
 }: { student?: Student | null; onClose: () => void; onSaved?: (id: string) => void }) {
@@ -77,6 +86,8 @@ export function StudentFormDialog({
   const save = useMutation({
     mutationFn: async () => {
       const { class_name, section_name, ...rest } = form;
+      rest.mobile = normalizeMobile(rest.mobile ?? '');
+      if (rest.mobile && rest.mobile.length !== 10) throw new Error('Mobile number must be exactly 10 digits.');
       if (!rest.enrollment_no) rest.enrollment_no = `C${Date.now().toString(36).toUpperCase()}`;
       const cls = await ClassesApi.ensure(rest.school_id!, class_name, section_name);
       const extra = Object.fromEntries(Object.entries(rest.extra ?? {}).map(([k, v]) => [k, String(v ?? '').trim()]).filter(([, v]) => v));
@@ -171,7 +182,15 @@ export function StudentFormDialog({
               </TextField>
             </Grid>
           )}
-          {field('mobile', 'Mobile', 3)}
+          {ask('mobile') && (
+            <Grid item xs={12} sm={3}>
+              <TextField fullWidth label="Mobile" value={form.mobile ?? ''}
+                onChange={(e) => set('mobile', normalizeMobile(e.target.value))}
+                error={!!form.mobile && form.mobile.length !== 10}
+                helperText={form.mobile && form.mobile.length !== 10 ? 'Mobile must be exactly 10 digits' : undefined}
+                inputProps={{ inputMode: 'numeric', maxLength: 14 }} />
+            </Grid>
+          )}
           {field('address', 'Address', 12, { multiline: true, minRows: 2 })}
           {extraKeys.map((k) => (
             <Grid item xs={12} sm={DATE_EXTRA_KEYS.has(k) ? 3 : 6} key={k}>
